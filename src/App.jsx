@@ -9,4885 +9,655 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { 
-  getFirestore, doc, setDoc, getDoc, onSnapshot
+  getFirestore, doc, setDoc, onSnapshot
 } from 'firebase/firestore';
-import { getAnalytics } from "firebase/analytics";
 
+let db = null;
+let auth = null;
+let appId = 'dunkest-auction-pro';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyC1jop2ZlePaMqL-6Ng5ZDpQNyxVtDMS5A",
-  authDomain: "dunkest-asta.firebaseapp.com",
-  projectId: "dunkest-asta",
-  storageBucket: "dunkest-asta.firebasestorage.app",
-  messagingSenderId: "432619397838",
-  appId: "1:432619397838:web:5d4d0ed6769768fdc3669f",
-  measurementId: "G-SQE5SHTJ3B"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = 'dunkest-auction-pro';
-const analytics = getAnalytics(app);
-
-// ---------------------------------------------------------
-// 1. INCOLLA QUI L'INTERO ARRAY JSON DI DUNKEST
-// ---------------------------------------------------------
-const RAW_DUNKEST_DATA = 
-  [
-  {
-    "First Name": "Nikola",
-    "Last Name": "Jokic",
-    "Position": "Center",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "30,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Victor",
-    "Last Name": "Wembanyama",
-    "Position": "Center",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "28,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Luka",
-    "Last Name": "Doncic",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "27,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Giannis",
-    "Last Name": "Antetokounmpo",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "25,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Shai",
-    "Last Name": "Gilgeous-Alexander",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "22,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cade",
-    "Last Name": "Cunningham",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "21,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Johnson",
-    "Position": "Forward",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "19,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jayson",
-    "Last Name": "Tatum",
-    "Position": "Forward",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "18,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Joel",
-    "Last Name": "Embiid",
-    "Position": "Center",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "18,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Domantas",
-    "Last Name": "Sabonis",
-    "Position": "Center",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "18,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alperen",
-    "Last Name": "Sengun",
-    "Position": "Center",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "17,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Scottie",
-    "Last Name": "Barnes",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "17,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyrese",
-    "Last Name": "Maxey",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "17,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Karl-anthony",
-    "Last Name": "Towns",
-    "Position": "Center",
-    "Team": "New York Knicks",
-    "Cr 26/27": "16,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Anthony",
-    "Last Name": "Edwards",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "16,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cooper",
-    "Last Name": "Flagg",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "16,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Anthony",
-    "Last Name": "Davis",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "16,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kevin",
-    "Last Name": "Durant",
-    "Position": "Forward",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "16,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Brunson",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "16,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "LeBron",
-    "Last Name": "James",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "16,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Josh",
-    "Last Name": "Giddey",
-    "Position": "Guard",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "15,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trae",
-    "Last Name": "Young",
-    "Position": "Guard",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "15,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kawhi",
-    "Last Name": "Leonard",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "15,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Amen",
-    "Last Name": "Thompson",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "15,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Stephen",
-    "Last Name": "Curry",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "15,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bam",
-    "Last Name": "Adebayo",
-    "Position": "Center",
-    "Team": "Miami Heat",
-    "Cr 26/27": "15,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamal",
-    "Last Name": "Murray",
-    "Position": "Guard",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "14,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Duren",
-    "Position": "Center",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "14,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyrese",
-    "Last Name": "Haliburton",
-    "Position": "Guard",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "14,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Lamelo",
-    "Last Name": "Ball",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "14,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Deni",
-    "Last Name": "Avdija",
-    "Position": "Forward",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "14,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Austin",
-    "Last Name": "Reaves",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "14,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Julius",
-    "Last Name": "Randle",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "14,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Evan",
-    "Last Name": "Mobley",
-    "Position": "Forward",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "14,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Paolo",
-    "Last Name": "Banchero",
-    "Position": "Forward",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "14,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaylen",
-    "Last Name": "Brown",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "14,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "AJ",
-    "Last Name": "Dybantsa",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "14,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "James",
-    "Last Name": "Harden",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "14,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Donovan",
-    "Last Name": "Mitchell",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "14,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Devin",
-    "Last Name": "Booker",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "14,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Caleb",
-    "Last Name": "Wilson",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "13,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chet",
-    "Last Name": "Holmgren",
-    "Position": "Forward",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "13,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Michael",
-    "Last Name": "Porter Jr",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "13,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Darius",
-    "Last Name": "Garland",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "13,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Donovan",
-    "Last Name": "Clingan",
-    "Position": "Center",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "13,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Damian",
-    "Last Name": "Lillard",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "13,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Stephon",
-    "Last Name": "Castle",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "13,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Williams",
-    "Position": "Forward",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "13,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ja",
-    "Last Name": "Morant",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "13,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Darryn",
-    "Last Name": "Peterson",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Lauri",
-    "Last Name": "Markkanen",
-    "Position": "Forward",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jarrett",
-    "Last Name": "Allen",
-    "Position": "Center",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cameron",
-    "Last Name": "Boozer",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Og",
-    "Last Name": "Anunoby",
-    "Position": "Forward",
-    "Team": "New York Knicks",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Pascal",
-    "Last Name": "Siakam",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ivica",
-    "Last Name": "Zubac",
-    "Position": "Center",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zion",
-    "Last Name": "Williamson",
-    "Position": "Forward",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "12,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kyrie",
-    "Last Name": "Irving",
-    "Position": "Guard",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dyson",
-    "Last Name": "Daniels",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Onyeka",
-    "Last Name": "Okongwu",
-    "Position": "Center",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyler",
-    "Last Name": "Herro",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dejounte",
-    "Last Name": "Murray",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Josh",
-    "Last Name": "Hart",
-    "Position": "Forward",
-    "Team": "New York Knicks",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Franz",
-    "Last Name": "Wagner",
-    "Position": "Forward",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Vj",
-    "Last Name": "Edgecombe",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaren",
-    "Last Name": "Jackson Jr",
-    "Position": "Forward",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "12,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Payton",
-    "Last Name": "Pritchard",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "11,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Paul",
-    "Last Name": "George",
-    "Position": "Forward",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "11,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trey",
-    "Last Name": "Murphy III",
-    "Position": "Forward",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "11,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ryan",
-    "Last Name": "Rollins",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "11,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rudy",
-    "Last Name": "Gobert",
-    "Position": "Center",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "11,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Desmond",
-    "Last Name": "Bane",
-    "Position": "Guard",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "11,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Keyonte",
-    "Last Name": "George",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "11,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nickeil",
-    "Last Name": "Alexander-Walker",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mike",
-    "Last Name": "Brown",
-    "Position": "Head Coach",
-    "Team": "New York Knicks",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mark",
-    "Last Name": "Daigneault",
-    "Position": "Head Coach",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mitch",
-    "Last Name": "Johnson",
-    "Position": "Head Coach",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Neemias",
-    "Last Name": "Queta",
-    "Position": "Center",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brandon",
-    "Last Name": "Miller",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kon",
-    "Last Name": "Knueppel",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Matas",
-    "Last Name": "Buzelis",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "De'Aaron",
-    "Last Name": "Fox",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Miles",
-    "Last Name": "Bridges",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "11,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Derrick",
-    "Last Name": "White",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brandin",
-    "Last Name": "Podziemski",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jabari",
-    "Last Name": "Smith Jr",
-    "Position": "Forward",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Andrew",
-    "Last Name": "Wiggins",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Hartenstein",
-    "Position": "Center",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tobias",
-    "Last Name": "Harris",
-    "Position": "Forward",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nick",
-    "Last Name": "Nurse",
-    "Position": "Head Coach",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Walker",
-    "Last Name": "Kessler",
-    "Position": "Center",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "10,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nikola",
-    "Last Name": "Vucevic",
-    "Position": "Center",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kel'el",
-    "Last Name": "Ware",
-    "Position": "Center",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "CJ",
-    "Last Name": "Mccollum",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Moussa",
-    "Last Name": "Diabate",
-    "Position": "Center",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ausar",
-    "Last Name": "Thompson",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Andrew",
-    "Last Name": "Nembhard",
-    "Position": "Guard",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brandon",
-    "Last Name": "Ingram",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kevin",
-    "Last Name": "Porter Jr",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ayo",
-    "Last Name": "Dosunmu",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Wendell",
-    "Last Name": "Carter Jr",
-    "Position": "Center",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Maxime",
-    "Last Name": "Raynaud",
-    "Position": "Center",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Devin",
-    "Last Name": "Vassell",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dylan",
-    "Last Name": "Harper",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "RJ",
-    "Last Name": "Barrett",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Immanuel",
-    "Last Name": "Quickley",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jusuf",
-    "Last Name": "Nurkic",
-    "Position": "Center",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Fred",
-    "Last Name": "Vanvleet",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "David",
-    "Last Name": "Adelman",
-    "Position": "Head Coach",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chris",
-    "Last Name": "Finch",
-    "Position": "Head Coach",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Naz",
-    "Last Name": "Reid",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "10,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Green",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mark",
-    "Last Name": "Williams",
-    "Position": "Center",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nicolas",
-    "Last Name": "Claxton",
-    "Position": "Center",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "John",
-    "Last Name": "Collins",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jimmy",
-    "Last Name": "Butler",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cam",
-    "Last Name": "Spencer",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaden",
-    "Last Name": "Mcdaniels",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Saddiq",
-    "Last Name": "Bey",
-    "Position": "Forward",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mikal",
-    "Last Name": "Bridges",
-    "Position": "Forward",
-    "Team": "New York Knicks",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Toumani",
-    "Last Name": "Camara",
-    "Position": "Forward",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Julian",
-    "Last Name": "Champagnie",
-    "Position": "Forward",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jakob",
-    "Last Name": "Poeltl",
-    "Position": "Center",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Deandre",
-    "Last Name": "Ayton",
-    "Position": "Center",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kenny",
-    "Last Name": "Atkinson",
-    "Position": "Head Coach",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "J.B.",
-    "Last Name": "Bickerstaff",
-    "Position": "Head Coach",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kyle",
-    "Last Name": "Filipowski",
-    "Position": "Center",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kristaps",
-    "Last Name": "Porzingis",
-    "Position": "Center",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "9,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Coby",
-    "Last Name": "White",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Davion",
-    "Last Name": "Mitchell",
-    "Position": "Guard",
-    "Team": "Miami Heat",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaime",
-    "Last Name": "Jaquez Jr",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Suggs",
-    "Position": "Guard",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tre",
-    "Last Name": "Jones",
-    "Position": "Guard",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Daniel",
-    "Last Name": "Gafford",
-    "Position": "Center",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "P.J.",
-    "Last Name": "Washington",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Demar",
-    "Last Name": "Derozan",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cameron",
-    "Last Name": "Johnson",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Gui",
-    "Last Name": "Santos",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Yaxel",
-    "Last Name": "Lendeborg",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Myles",
-    "Last Name": "Turner",
-    "Position": "Center",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Derik",
-    "Last Name": "Queen",
-    "Position": "Center",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Collin",
-    "Last Name": "Gillespie",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dillon",
-    "Last Name": "Brooks",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jrue",
-    "Last Name": "Holiday",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Precious",
-    "Last Name": "Achiuwa",
-    "Position": "Forward",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Darius",
-    "Last Name": "Acuff Jr",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zach",
-    "Last Name": "Edey",
-    "Position": "Center",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ime",
-    "Last Name": "Udoka",
-    "Position": "Head Coach",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Erik",
-    "Last Name": "Spoelstra",
-    "Position": "Head Coach",
-    "Team": "Miami Heat",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Norman",
-    "Last Name": "Powell",
-    "Position": "Guard",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "9,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "Poole",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jeremiah",
-    "Last Name": "Fears",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Collin",
-    "Last Name": "Murray-boyles",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mikel",
-    "Last Name": "Brown Jr.",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Peyton",
-    "Last Name": "Watson",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Aaron",
-    "Last Name": "Gordon",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Christian",
-    "Last Name": "Braun",
-    "Position": "Guard",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tari",
-    "Last Name": "Eason",
-    "Position": "Forward",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jerami",
-    "Last Name": "Grant",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cason",
-    "Last Name": "Wallace",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ace",
-    "Last Name": "Bailey",
-    "Position": "Forward",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Collier",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dereck",
-    "Last Name": "Lively II",
-    "Position": "Center",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Quin",
-    "Last Name": "Snyder",
-    "Position": "Head Coach",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rick",
-    "Last Name": "Carlisle",
-    "Position": "Head Coach",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rui",
-    "Last Name": "Hachimura",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alex",
-    "Last Name": "Sarr",
-    "Position": "Center",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Day'ron",
-    "Last Name": "Sharpe",
-    "Position": "Center",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bradley",
-    "Last Name": "Beal",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "8,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dennis",
-    "Last Name": "Schroder",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "8,2",
-    "Cr": ""
-  },
-  {
-    "First Name": "Shaedon",
-    "Last Name": "Sharpe",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kelly",
-    "Last Name": "Oubre Jr",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Keaton",
-    "Last Name": "Wagler",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Santi",
-    "Last Name": "Aldama",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Royce",
-    "Last Name": "O'Neale",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ajay",
-    "Last Name": "Mitchell",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brice",
-    "Last Name": "Sensabaugh",
-    "Position": "Forward",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Carlton",
-    "Last Name": "Carrington",
-    "Position": "Guard",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cedric",
-    "Last Name": "Coward",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Donte",
-    "Last Name": "DiVincenzo",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Naji",
-    "Last Name": "Marshall",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Draymond",
-    "Last Name": "Green",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brook",
-    "Last Name": "Lopez",
-    "Position": "Center",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bobby",
-    "Last Name": "Portis",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bennedict",
-    "Last Name": "Mathurin",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Robert",
-    "Last Name": "Williams III",
-    "Position": "Center",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bilal",
-    "Last Name": "Coulibaly",
-    "Position": "Guard",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kyshawn",
-    "Last Name": "George",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Scotty",
-    "Last Name": "Pippen Jr",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "JJ",
-    "Last Name": "Redick",
-    "Position": "Head Coach",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Joe",
-    "Last Name": "Mazzulla",
-    "Position": "Head Coach",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Darko",
-    "Last Name": "Rajakovic",
-    "Position": "Head Coach",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Keegan",
-    "Last Name": "Murray",
-    "Position": "Forward",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Anfernee",
-    "Last Name": "Simons",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "8,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Oso",
-    "Last Name": "Ighodaro",
-    "Position": "Center",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ryan",
-    "Last Name": "Kalkbrenner",
-    "Position": "Center",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Leonard",
-    "Last Name": "Miller",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jarace",
-    "Last Name": "Walker",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Olivier",
-    "Last Name": "Maxence-Prosper",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cody",
-    "Last Name": "Williams",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Max",
-    "Last Name": "Christie",
-    "Position": "Guard",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kingston",
-    "Last Name": "Flemings",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Aaron",
-    "Last Name": "Nesmith",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Morez",
-    "Last Name": "Johnson",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Duncan",
-    "Last Name": "Robinson",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Moses",
-    "Last Name": "Moody",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Reed",
-    "Last Name": "Sheppard",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kris",
-    "Last Name": "Dunn",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Collin",
-    "Last Name": "Sexton",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sandro",
-    "Last Name": "Mamukelashvili",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Pelle",
-    "Last Name": "Larsson",
-    "Position": "Guard",
-    "Team": "Miami Heat",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "A.J.",
-    "Last Name": "Green",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Luke",
-    "Last Name": "Kennard",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zach",
-    "Last Name": "Lavine",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Justin",
-    "Last Name": "Champagnie",
-    "Position": "Guard",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ty",
-    "Last Name": "Jerome",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jason",
-    "Last Name": "Kidd",
-    "Position": "Head Coach",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamahl",
-    "Last Name": "Mosley",
-    "Position": "Head Coach",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tiago",
-    "Last Name": "Splitter",
-    "Position": "Head Coach",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brian",
-    "Last Name": "Keefe",
-    "Position": "Head Coach",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "7,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Quentin",
-    "Last Name": "Grimes",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jay",
-    "Last Name": "Huff",
-    "Position": "Center",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sam",
-    "Last Name": "Hauser",
-    "Position": "Forward",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brandon",
-    "Last Name": "Williams",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Oscar",
-    "Last Name": "Tshiebwe",
-    "Position": "Center",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "T.J.",
-    "Last Name": "Mcconnell",
-    "Position": "Guard",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jericho",
-    "Last Name": "Sims",
-    "Position": "Center",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Will",
-    "Last Name": "Riley",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Marvin",
-    "Last Name": "Bagley III",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Grayson",
-    "Last Name": "Allen",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Hannes",
-    "Last Name": "Steinbach",
-    "Position": "Center",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Smith",
-    "Position": "Center",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Gary",
-    "Last Name": "Payton II",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "De'Anthony",
-    "Last Name": "Melton",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Marcus",
-    "Last Name": "Smart",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "Miller",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Gregory",
-    "Last Name": "Jackson",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaylen",
-    "Last Name": "Wells",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kyle",
-    "Last Name": "Kuzma",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brayden",
-    "Last Name": "Burries",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nate",
-    "Last Name": "Ament",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jonathan",
-    "Last Name": "Kuminga",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Anthony",
-    "Last Name": "Black",
-    "Position": "Guard",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "Goodwin",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nique",
-    "Last Name": "Clifford",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ja'kobe",
-    "Last Name": "Walter",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jake",
-    "Last Name": "Laravia",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Doc",
-    "Last Name": "Rivers",
-    "Position": "Head Coach",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Charles",
-    "Last Name": "Lee",
-    "Position": "Head Coach",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Steve",
-    "Last Name": "Kerr",
-    "Position": "Head Coach",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "Ott",
-    "Position": "Head Coach",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ousmane",
-    "Last Name": "Dieng",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Yves",
-    "Last Name": "Missi",
-    "Position": "Center",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Aday",
-    "Last Name": "Mara",
-    "Position": "Center",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Keldon",
-    "Last Name": "Johnson",
-    "Position": "Forward",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Julian",
-    "Last Name": "Reese",
-    "Position": "Forward",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Keon",
-    "Last Name": "Ellis",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "7,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Micah",
-    "Last Name": "Potter",
-    "Position": "Center",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Noah",
-    "Last Name": "Clowney",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Al",
-    "Last Name": "Horford",
-    "Position": "Center",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Slawson",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Derrick",
-    "Last Name": "Jones Jr",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Javon",
-    "Last Name": "Small",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tim",
-    "Last Name": "Hardaway Jr",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alex",
-    "Last Name": "Caruso",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Scoot",
-    "Last Name": "Henderson",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Malik",
-    "Last Name": "Monk",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dylan",
-    "Last Name": "Cardwell",
-    "Position": "Center",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Malachi",
-    "Last Name": "Smith",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamal",
-    "Last Name": "Shead",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Stewart",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "De'Andre",
-    "Last Name": "Hunter",
-    "Position": "Forward",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Herbert",
-    "Last Name": "Jones",
-    "Position": "Forward",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Billy",
-    "Last Name": "Donovan",
-    "Position": "Head Coach",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyronn",
-    "Last Name": "Lue",
-    "Position": "Head Coach",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Will",
-    "Last Name": "Hardy",
-    "Position": "Head Coach",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "James",
-    "Last Name": "Borrego",
-    "Position": "Head Coach",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mitchell",
-    "Last Name": "Robinson",
-    "Position": "Center",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Aaron",
-    "Last Name": "Wiggins",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "Walsh",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nikola",
-    "Last Name": "Jovic",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jose",
-    "Last Name": "Alvarado",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Miles",
-    "Last Name": "McBride",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Adem",
-    "Last Name": "Bona",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jeremy",
-    "Last Name": "Sochan",
-    "Position": "Forward",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kevin",
-    "Last Name": "Huerter",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "6,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jared",
-    "Last Name": "Mccain",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "6,2",
-    "Cr": ""
-  },
-  {
-    "First Name": "Devin",
-    "Last Name": "Carter",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Daniss",
-    "Last Name": "Jenkins",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Paul",
-    "Last Name": "Reed",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Taurean",
-    "Last Name": "Prince",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sharife",
-    "Last Name": "Cooper",
-    "Position": "Guard",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Baylor",
-    "Last Name": "Scheierman",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jock",
-    "Last Name": "Landale",
-    "Position": "Center",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Egor",
-    "Last Name": "Demin",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Danny",
-    "Last Name": "Wolf",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bruce",
-    "Last Name": "Brown",
-    "Position": "Guard",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Obi",
-    "Last Name": "Toppin",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kobe",
-    "Last Name": "Brown",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Max",
-    "Last Name": "Strus",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Klay",
-    "Last Name": "Thompson",
-    "Position": "Guard",
-    "Team": "Miami Heat",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kasparas",
-    "Last Name": "Jakucionis",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ben",
-    "Last Name": "Simmons",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Andre",
-    "Last Name": "Drummond",
-    "Position": "Center",
-    "Team": "New York Knicks",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaylin",
-    "Last Name": "Williams",
-    "Position": "Forward",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Goga",
-    "Last Name": "Bitadze",
-    "Position": "Center",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tristan",
-    "Last Name": "Da Silva",
-    "Position": "Forward",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bez",
-    "Last Name": "Mbeng",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaxson",
-    "Last Name": "Hayes",
-    "Position": "Center",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Anthony",
-    "Last Name": "Gill",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Khris",
-    "Last Name": "Middleton",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Taylor",
-    "Last Name": "Hendricks",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Joe",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Carter",
-    "Last Name": "Bryant",
-    "Position": "Forward",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordi",
-    "Last Name": "Fernandez",
-    "Position": "Head Coach",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tuomas",
-    "Last Name": "Iisalo",
-    "Position": "Head Coach",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Doug",
-    "Last Name": "Christie",
-    "Position": "Head Coach",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Luguentz",
-    "Last Name": "Dort",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Hugo",
-    "Last Name": "Gonzalez",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Michael",
-    "Last Name": "Ajayi",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Steven",
-    "Last Name": "Adams",
-    "Position": "Center",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bogdan",
-    "Last Name": "Bogdanovic",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "Clarkson",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ebuka",
-    "Last Name": "Okorie",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mike",
-    "Last Name": "Conley",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Simone",
-    "Last Name": "Fontecchio",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Meleek",
-    "Last Name": "Thomas",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Svi",
-    "Last Name": "Mykhailiuk",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "6,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sergio",
-    "Last Name": "De Larrea",
-    "Position": "Guard",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ryan",
-    "Last Name": "Nembhard",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nolan",
-    "Last Name": "Traore",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chaney",
-    "Last Name": "Johnson",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "E.J.",
-    "Last Name": "Liddell",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ben",
-    "Last Name": "Saraf",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaac",
-    "Last Name": "Okoro",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dailyn",
-    "Last Name": "Swain",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sam",
-    "Last Name": "Merrill",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Quenton",
-    "Last Name": "Jackson",
-    "Position": "Guard",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ziaire",
-    "Last Name": "Williams",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Karim",
-    "Last Name": "Lopez",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Karlo",
-    "Last Name": "Matkovic",
-    "Position": "Forward",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bennett",
-    "Last Name": "Stirtz",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jayden",
-    "Last Name": "Quaintance",
-    "Position": "Forward",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tre",
-    "Last Name": "Johnson",
-    "Position": "Guard",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamir",
-    "Last Name": "Watkins",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cameron",
-    "Last Name": "Carr",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Patrick",
-    "Last Name": "Williams",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zaccharie",
-    "Last Name": "Risacher",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Clint",
-    "Last Name": "Capela",
-    "Position": "Center",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Caleb",
-    "Last Name": "Love",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "5,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Gabe",
-    "Last Name": "Vincent",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "5,2",
-    "Cr": ""
-  },
-  {
-    "First Name": "Gradey",
-    "Last Name": "Dick",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mario",
-    "Last Name": "Hezonja",
-    "Position": "Forward",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chris",
-    "Last Name": "Cenac Jr.",
-    "Position": "Forward",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Josh",
-    "Last Name": "Minott",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Terance",
-    "Last Name": "Mann",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Christian",
-    "Last Name": "Anderson",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Spencer",
-    "Last Name": "Jones",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Elijah",
-    "Last Name": "Harkless",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Charles",
-    "Last Name": "Bassey",
-    "Position": "Center",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ben",
-    "Last Name": "Sheppard",
-    "Position": "Guard",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kobe",
-    "Last Name": "Sanders",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Jackson",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaden",
-    "Last Name": "Hardy",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Walter",
-    "Last Name": "Clayton Jr.",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jahmai",
-    "Last Name": "Mashack",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nick",
-    "Last Name": "Richards",
-    "Position": "Center",
-    "Team": "Miami Heat",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Caris",
-    "Last Name": "Levert",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Pete",
-    "Last Name": "Nance",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "Hawkins",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Landry",
-    "Last Name": "Shamet",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dominick",
-    "Last Name": "Barlow",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dean",
-    "Last Name": "Wade",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Labaron",
-    "Last Name": "Philon",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Pat",
-    "Last Name": "Spencer",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Luke",
-    "Last Name": "Kornet",
-    "Position": "Center",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Blake",
-    "Last Name": "Hinson",
-    "Position": "Forward",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tristan",
-    "Last Name": "Vukcevic",
-    "Position": "Forward",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bronny",
-    "Last Name": "James",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "D'angelo",
-    "Last Name": "Russell",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Johni",
-    "Last Name": "Broome",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Josh",
-    "Last Name": "Green",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "5,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Wilson",
-    "Position": "Forward",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zuby",
-    "Last Name": "Ejiofor",
-    "Position": "Forward",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Luka",
-    "Last Name": "Garza",
-    "Position": "Center",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Joshua",
-    "Last Name": "Jefferson",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Grant",
-    "Last Name": "Williams",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sion",
-    "Last Name": "James",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rob",
-    "Last Name": "Dillingham",
-    "Position": "Guard",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaylon",
-    "Last Name": "Tyson",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dwight",
-    "Last Name": "Powell",
-    "Position": "Center",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Moussa",
-    "Last Name": "Cisse",
-    "Position": "Center",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Georges",
-    "Last Name": "Niang",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kevon",
-    "Last Name": "Looney",
-    "Position": "Center",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Quinten",
-    "Last Name": "Post",
-    "Position": "Center",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dru",
-    "Last Name": "Smith",
-    "Position": "Guard",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kam",
-    "Last Name": "Jones",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Gary",
-    "Last Name": "Trent Jr",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Terrence",
-    "Last Name": "Shannon",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Micah",
-    "Last Name": "Peavy",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamal",
-    "Last Name": "Cain",
-    "Position": "Forward",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rayan",
-    "Last Name": "Rupert",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Koa",
-    "Last Name": "Peat",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sidy",
-    "Last Name": "Cissoko",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alex",
-    "Last Name": "Karaban",
-    "Position": "Forward",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tarris",
-    "Last Name": "Reed Jr",
-    "Position": "Center",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Allen",
-    "Last Name": "Graves",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alijah",
-    "Last Name": "Martin",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nate",
-    "Last Name": "Bittle",
-    "Position": "Center",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaden",
-    "Last Name": "Bradley",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kevin",
-    "Last Name": "Love",
-    "Position": "Forward",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tamar",
-    "Last Name": "Bates",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Felix",
-    "Last Name": "Okpara",
-    "Position": "Center",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tre",
-    "Last Name": "Mann",
-    "Position": "Guard",
-    "Team": "Washington Wizards",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trey",
-    "Last Name": "Alexander",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "4,5",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tony",
-    "Last Name": "Bradley",
-    "Position": "Center",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Keaton",
-    "Last Name": "Wallace",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Buddy",
-    "Last Name": "Hield",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Asa",
-    "Last Name": "Newell",
-    "Position": "Forward",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mouhamed",
-    "Last Name": "Gueye",
-    "Position": "Forward",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Corey",
-    "Last Name": "Kispert",
-    "Position": "Forward",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rayj",
-    "Last Name": "Dennis",
-    "Position": "Guard",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Henri",
-    "Last Name": "Veesaar",
-    "Position": "Center",
-    "Team": "Atlanta Hawks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Max",
-    "Last Name": "Shulga",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Amari",
-    "Last Name": "Williams",
-    "Position": "Forward",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ron",
-    "Last Name": "Harper Jr.",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dillon",
-    "Last Name": "Mitchell",
-    "Position": "Forward",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Milos",
-    "Last Name": "Uzan",
-    "Position": "Guard",
-    "Team": "Boston Celtics",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Drake",
-    "Last Name": "Powell",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Moritz",
-    "Last Name": "Wagner",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyler",
-    "Last Name": "Bilodeau",
-    "Position": "Forward",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kylan",
-    "Last Name": "Boswell",
-    "Position": "Guard",
-    "Team": "Brooklyn Nets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dorian",
-    "Last Name": "Finney-Smith",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Antonio",
-    "Last Name": "Reeves",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Pj",
-    "Last Name": "Hall",
-    "Position": "Center",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Pat",
-    "Last Name": "Connaughton",
-    "Position": "Guard",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Xavier",
-    "Last Name": "Tillman",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tidjane",
-    "Last Name": "Salaun",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Liam",
-    "Last Name": "Mcneeley",
-    "Position": "Forward",
-    "Team": "Charlotte Hornets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zach",
-    "Last Name": "Collins",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Noa",
-    "Last Name": "Essengue",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tobe",
-    "Last Name": "Awaka",
-    "Position": "Forward",
-    "Team": "Chicago Bulls",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Thomas",
-    "Last Name": "Bryant",
-    "Position": "Center",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Craig",
-    "Last Name": "Porter",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyrese",
-    "Last Name": "Proctor",
-    "Position": "Guard",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nae'qwan",
-    "Last Name": "Tomlin",
-    "Position": "Forward",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Riley",
-    "Last Name": "Minix",
-    "Position": "Forward",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tristan",
-    "Last Name": "Enaruna",
-    "Position": "Forward",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ernest",
-    "Last Name": "Udeh Jr.",
-    "Position": "Center",
-    "Team": "Cleveland Cavaliers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Marcus",
-    "Last Name": "Sasser",
-    "Position": "Guard",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jett",
-    "Last Name": "Howard",
-    "Position": "Guard",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Caleb",
-    "Last Name": "Martin",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "John",
-    "Last Name": "Poulakidas",
-    "Position": "Guard",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tobias",
-    "Last Name": "Lawal",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tarik",
-    "Last Name": "Biberovic",
-    "Position": "Forward",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Vsevolod",
-    "Last Name": "Ishchenko",
-    "Position": "Guard",
-    "Team": "Dallas Mavericks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Julian",
-    "Last Name": "Strawther",
-    "Position": "Guard",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyus",
-    "Last Name": "Jones",
-    "Position": "Guard",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Daron",
-    "Last Name": "Holmes II",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zeke",
-    "Last Name": "Nnaji",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kj",
-    "Last Name": "Simpson",
-    "Position": "Guard",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "David",
-    "Last Name": "Roddy",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Curtis",
-    "Last Name": "Jones",
-    "Position": "Guard",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trevon",
-    "Last Name": "Brazile",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alpha",
-    "Last Name": "Diallo",
-    "Position": "Forward",
-    "Team": "Denver Nuggets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaac",
-    "Last Name": "Jones",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ron",
-    "Last Name": "Holland II",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Gary",
-    "Last Name": "Harris",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Wendell",
-    "Last Name": "Moore",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chaz",
-    "Last Name": "Lanier",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Javonte",
-    "Last Name": "Green",
-    "Position": "Guard",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tolu",
-    "Last Name": "Smith",
-    "Position": "Forward",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ugonna",
-    "Last Name": "Onyenso",
-    "Position": "Center",
-    "Team": "Detroit Pistons",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Will",
-    "Last Name": "Richard",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nate",
-    "Last Name": "Williams",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alex",
-    "Last Name": "Toohey",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Seth",
-    "Last Name": "Curry",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "LJ",
-    "Last Name": "Cryer",
-    "Position": "Guard",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Lajae",
-    "Last Name": "Jones",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Malevy",
-    "Last Name": "Leons",
-    "Position": "Forward",
-    "Team": "Golden State Warriors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Julian",
-    "Last Name": "Phillips",
-    "Position": "Forward",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jae'Sean",
-    "Last Name": "Tate",
-    "Position": "Forward",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jeff",
-    "Last Name": "Green",
-    "Position": "Forward",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Crawford",
-    "Position": "Forward",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Sean",
-    "Last Name": "Pedulla",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bruce",
-    "Last Name": "Thornton",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Quadir",
-    "Last Name": "Copeland",
-    "Position": "Guard",
-    "Team": "Houston Rockets",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Johnny",
-    "Last Name": "Furphy",
-    "Position": "Guard",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Larry",
-    "Last Name": "Nance Jr",
-    "Position": "Forward",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Braden",
-    "Last Name": "Smith",
-    "Position": "Guard",
-    "Team": "Indiana Pacers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Yuki",
-    "Last Name": "Kawamura",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "TyTy",
-    "Last Name": "Washington",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Yanic Konan",
-    "Last Name": "Niederhauser",
-    "Position": "Center",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cam",
-    "Last Name": "Christie",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jalen",
-    "Last Name": "Pickett",
-    "Position": "Guard",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nicolas",
-    "Last Name": "Batum",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamarion",
-    "Last Name": "Sharp",
-    "Position": "Center",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Norchad",
-    "Last Name": "Omier",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Baba",
-    "Last Name": "Miller",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nick",
-    "Last Name": "Martinelli",
-    "Position": "Forward",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Narcisse",
-    "Last Name": "Ngoy",
-    "Position": "Center",
-    "Team": "Los Angeles Clippers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Matisse",
-    "Last Name": "Thybulle",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Adou",
-    "Last Name": "Thiero",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jarred",
-    "Last Name": "Vanderbilt",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dalton",
-    "Last Name": "Knecht",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chris",
-    "Last Name": "Manon",
-    "Position": "Guard",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "AK",
-    "Last Name": "Okereke",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Arthur",
-    "Last Name": "Kaluma",
-    "Position": "Forward",
-    "Team": "Los Angeles Lakers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Aj",
-    "Last Name": "Johnson",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kris",
-    "Last Name": "Murray",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Taj",
-    "Last Name": "Gibson",
-    "Position": "Forward",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Richie",
-    "Last Name": "Saunders",
-    "Position": "Guard",
-    "Team": "Memphis Grizzlies",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Keshad",
-    "Last Name": "Johnson",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jahmir",
-    "Last Name": "Young",
-    "Position": "Guard",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Myron",
-    "Last Name": "Gardner",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trevor",
-    "Last Name": "Keels",
-    "Position": "Guard",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ryan",
-    "Last Name": "Conwell",
-    "Position": "Guard",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tre",
-    "Last Name": "Donaldson",
-    "Position": "Forward",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Vladislav",
-    "Last Name": "Goldin",
-    "Position": "Center",
-    "Team": "Miami Heat",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Thanasis",
-    "Last Name": "Antetokounmpo",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bogoljub",
-    "Last Name": "Markovic",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Cormac",
-    "Last Name": "Ryan",
-    "Position": "Guard",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Malique",
-    "Last Name": "Lewis",
-    "Position": "Forward",
-    "Team": "Milwaukee Bucks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nah'shon",
-    "Last Name": "Hyland",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaylen",
-    "Last Name": "Clark",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Joan",
-    "Last Name": "Beringer",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Enrique",
-    "Last Name": "Freeman",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trey",
-    "Last Name": "Kaufman-Renn",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Zyon",
-    "Last Name": "Pullin",
-    "Position": "Guard",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Evans",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trey",
-    "Last Name": "Lyles",
-    "Position": "Forward",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rocco",
-    "Last Name": "Zikarsky",
-    "Position": "Center",
-    "Team": "Minnesota Timberwolves",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Caleb",
-    "Last Name": "Houstan",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Deandre",
-    "Last Name": "Jordan",
-    "Position": "Center",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Christian",
-    "Last Name": "Koloko",
-    "Position": "Center",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Bryce",
-    "Last Name": "McGowens",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trendon",
-    "Last Name": "Watford",
-    "Position": "Forward",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kobe",
-    "Last Name": "Bufkin",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jaron",
-    "Last Name": "Pierre Jr",
-    "Position": "Guard",
-    "Team": "New Orleans Pelicans",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Pacome",
-    "Last Name": "Dadiet",
-    "Position": "Forward",
-    "Team": "New York Knicks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kevin",
-    "Last Name": "Mccullar Jr",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyler",
-    "Last Name": "Kolek",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mohamed",
-    "Last Name": "Diawara",
-    "Position": "Forward",
-    "Team": "New York Knicks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Dillon",
-    "Last Name": "Jones",
-    "Position": "Forward",
-    "Team": "New York Knicks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jack",
-    "Last Name": "Kayil",
-    "Position": "Guard",
-    "Team": "New York Knicks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyler",
-    "Last Name": "Nickel",
-    "Position": "Forward",
-    "Team": "New York Knicks",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kenrich",
-    "Last Name": "Williams",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Brooks",
-    "Last Name": "Barnhizer",
-    "Position": "Forward",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Nikola",
-    "Last Name": "Topic",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Thomas",
-    "Last Name": "Sorber",
-    "Position": "Center",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Otega",
-    "Last Name": "Oweh",
-    "Position": "Guard",
-    "Team": "Oklahoma City Thunder",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jonathan",
-    "Last Name": "Isaac",
-    "Position": "Forward",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jevon",
-    "Last Name": "Carter",
-    "Position": "Guard",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jase",
-    "Last Name": "Richardson",
-    "Position": "Guard",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Colin",
-    "Last Name": "Castleton",
-    "Position": "Center",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Noah",
-    "Last Name": "Penda",
-    "Position": "Guard",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Izaiyah",
-    "Last Name": "Nelson",
-    "Position": "Forward",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Alex",
-    "Last Name": "Morales",
-    "Position": "Guard",
-    "Team": "Orlando Magic",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kentavious",
-    "Last Name": "Caldwell-Pope",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kyle",
-    "Last Name": "Lowry",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Justin",
-    "Last Name": "Edwards",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Marjon",
-    "Last Name": "Beauchamp",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Tyrese",
-    "Last Name": "Martin",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jabari",
-    "Last Name": "Walker",
-    "Position": "Forward",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ariel",
-    "Last Name": "Hukporti",
-    "Position": "Center",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Duke",
-    "Last Name": "Miles",
-    "Position": "Guard",
-    "Team": "Philadelphia 76ers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ryan",
-    "Last Name": "Dunn",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Amir",
-    "Last Name": "Coffey",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Haywood",
-    "Last Name": "Highsmith",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Khaman",
-    "Last Name": "Maluach",
-    "Position": "Center",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamaree",
-    "Last Name": "Bouyea",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Isaiah",
-    "Last Name": "Livers",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Rasheer",
-    "Last Name": "Fleming",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Koby",
-    "Last Name": "Brea",
-    "Position": "Guard",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "CJ",
-    "Last Name": "Huntley",
-    "Position": "Forward",
-    "Team": "Phoenix Suns",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Blake",
-    "Last Name": "Wesley",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chris",
-    "Last Name": "Youngblood",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Branden",
-    "Last Name": "Carlson",
-    "Position": "Center",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Yang",
-    "Last Name": "Hansen",
-    "Position": "Center",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Vit",
-    "Last Name": "Krejci",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "John",
-    "Last Name": "Tonje",
-    "Position": "Guard",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jayson",
-    "Last Name": "Kent",
-    "Position": "Forward",
-    "Team": "Portland Trail Blazers",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jonathan",
-    "Last Name": "Mogbo",
-    "Position": "Forward",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Adam",
-    "Last Name": "Flagler",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Daeqwon",
-    "Last Name": "Plowden",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Emanuel",
-    "Last Name": "Sharp",
-    "Position": "Guard",
-    "Team": "Sacramento Kings",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Taelon",
-    "Last Name": "Peter",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jordan",
-    "Last Name": "McLaughlin",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "David Jones",
-    "Last Name": "Garcia",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Harrison",
-    "Last Name": "Barnes",
-    "Position": "Forward",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Ja'Kobi",
-    "Last Name": "Gillespie",
-    "Position": "Guard",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Maliq",
-    "Last Name": "Brown",
-    "Position": "Forward",
-    "Team": "San Antonio Spurs",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "A.j.",
-    "Last Name": "Lawson",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Kyle",
-    "Last Name": "Anderson",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trayce",
-    "Last Name": "Jackson-Davis",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Andre",
-    "Last Name": "Jackson Jr",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Jamison",
-    "Last Name": "Battle",
-    "Position": "Forward",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Chucky",
-    "Last Name": "Hepburn",
-    "Position": "Guard",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Trey",
-    "Last Name": "Jemison III",
-    "Position": "Center",
-    "Team": "Toronto Raptors",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Mo",
-    "Last Name": "Bamba",
-    "Position": "Center",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Josh",
-    "Last Name": "Okogie",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Harrison",
-    "Last Name": "Ingram",
-    "Position": "Forward",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "4,0",
-    "Cr": ""
-  },
-  {
-    "First Name": "Hayden",
-    "Last Name": "Gray",
-    "Position": "Guard",
-    "Team": "Utah Jazz",
-    "Cr 26/27": "4,0",
-    "Cr": ""
+try {
+  if (typeof __firebase_config !== 'undefined') {
+    const firebaseConfig = JSON.parse(__firebase_config);
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    if (typeof __app_id !== 'undefined') {
+      appId = __app_id;
+    }
   }
+} catch (e) {
+  console.warn("Firebase initialization skipped or using local fallback mode:", e);
+}
 
+// 1. IL TUO NUOVO DATABASE IN FORMATO JSON GREZZO
+const RAW_PLAYERS_JSON = [
+  { "First Name": "Nikola", "Last Name": "Jokic", "Position": "Center", "Team": "Denver Nuggets", "Cr 26/27": "30,0", "Cr": "" },
+  { "First Name": "Victor", "Last Name": "Wembanyama", "Position": "Center", "Team": "San Antonio Spurs", "Cr 26/27": "28,0", "Cr": "" },
+  { "First Name": "Luka", "Last Name": "Doncic", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "27,0", "Cr": "" },
+  { "First Name": "Giannis", "Last Name": "Antetokounmpo", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "25,0", "Cr": "" },
+  { "First Name": "Shai", "Last Name": "Gilgeous-Alexander", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "22,0", "Cr": "" },
+  { "First Name": "Cade", "Last Name": "Cunningham", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "21,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Johnson", "Position": "Forward", "Team": "Atlanta Hawks", "Cr 26/27": "19,0", "Cr": "" },
+  { "First Name": "Jayson", "Last Name": "Tatum", "Position": "Forward", "Team": "Boston Celtics", "Cr 26/27": "18,0", "Cr": "" },
+  { "First Name": "Joel", "Last Name": "Embiid", "Position": "Center", "Team": "Philadelphia 76ers", "Cr 26/27": "18,0", "Cr": "" },
+  { "First Name": "Domantas", "Last Name": "Sabonis", "Position": "Center", "Team": "Sacramento Kings", "Cr 26/27": "18,0", "Cr": "" },
+  { "First Name": "Alperen", "Last Name": "Sengun", "Position": "Center", "Team": "Houston Rockets", "Cr 26/27": "17,5", "Cr": "" },
+  { "First Name": "Scottie", "Last Name": "Barnes", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "17,0", "Cr": "" },
+  { "First Name": "Tyrese", "Last Name": "Maxey", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "17,0", "Cr": "" },
+  { "First Name": "Karl-anthony", "Last Name": "Towns", "Position": "Center", "Team": "New York Knicks", "Cr 26/27": "16,5", "Cr": "" },
+  { "First Name": "Anthony", "Last Name": "Edwards", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "16,5", "Cr": "" },
+  { "First Name": "Cooper", "Last Name": "Flagg", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "16,5", "Cr": "" },
+  { "First Name": "Anthony", "Last Name": "Davis", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "16,0", "Cr": "" },
+  { "First Name": "Kevin", "Last Name": "Durant", "Position": "Forward", "Team": "Houston Rockets", "Cr 26/27": "16,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Brunson", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "16,0", "Cr": "" },
+  { "First Name": "LeBron", "Last Name": "James", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "16,0", "Cr": "" },
+  { "First Name": "Josh", "Last Name": "Giddey", "Position": "Guard", "Team": "Chicago Bulls", "Cr 26/27": "15,5", "Cr": "" },
+  { "First Name": "Trae", "Last Name": "Young", "Position": "Guard", "Team": "Washington Wizards", "Cr 26/27": "15,5", "Cr": "" },
+  { "First Name": "Kawhi", "Last Name": "Leonard", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "15,0", "Cr": "" },
+  { "First Name": "Amen", "Last Name": "Thompson", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "15,0", "Cr": "" },
+  { "First Name": "Stephen", "Last Name": "Curry", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "15,0", "Cr": "" },
+  { "First Name": "Bam", "Last Name": "Adebayo", "Position": "Center", "Team": "Miami Heat", "Cr 26/27": "15,0", "Cr": "" },
+  { "First Name": "Jamal", "Last Name": "Murray", "Position": "Guard", "Team": "Denver Nuggets", "Cr 26/27": "14,5", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Duren", "Position": "Center", "Team": "Detroit Pistons", "Cr 26/27": "14,5", "Cr": "" },
+  { "First Name": "Tyrese", "Last Name": "Haliburton", "Position": "Guard", "Team": "Indiana Pacers", "Cr 26/27": "14,5", "Cr": "" },
+  { "First Name": "Lamelo", "Last Name": "Ball", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "14,5", "Cr": "" },
+  { "First Name": "Deni", "Last Name": "Avdija", "Position": "Forward", "Team": "Portland Trail Blazers", "Cr 26/27": "14,5", "Cr": "" },
+  { "First Name": "Austin", "Last Name": "Reaves", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "14,5", "Cr": "" },
+  { "First Name": "Julius", "Last Name": "Randle", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "14,5", "Cr": "" },
+  { "First Name": "Evan", "Last Name": "Mobley", "Position": "Forward", "Team": "Cleveland Cavaliers", "Cr 26/27": "14,0", "Cr": "" },
+  { "First Name": "Paolo", "Last Name": "Banchero", "Position": "Forward", "Team": "Orlando Magic", "Cr 26/27": "14,0", "Cr": "" },
+  { "First Name": "Jaylen", "Last Name": "Brown", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "14,0", "Cr": "" },
+  { "First Name": "AJ", "Last Name": "Dybantsa", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "14,0", "Cr": "" },
+  { "First Name": "James", "Last Name": "Harden", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "14,0", "Cr": "" },
+  { "First Name": "Donovan", "Last Name": "Mitchell", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "14,0", "Cr": "" },
+  { "First Name": "Devin", "Last Name": "Booker", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "14,0", "Cr": "" },
+  { "First Name": "Caleb", "Last Name": "Wilson", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "13,5", "Cr": "" },
+  { "First Name": "Chet", "Last Name": "Holmgren", "Position": "Forward", "Team": "Oklahoma City Thunder", "Cr 26/27": "13,5", "Cr": "" },
+  { "First Name": "Michael", "Last Name": "Porter Jr", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "13,0", "Cr": "" },
+  { "First Name": "Darius", "Last Name": "Garland", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "13,0", "Cr": "" },
+  { "First Name": "Donovan", "Last Name": "Clingan", "Position": "Center", "Team": "Portland Trail Blazers", "Cr 26/27": "13,0", "Cr": "" },
+  { "First Name": "Damian", "Last Name": "Lillard", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "13,0", "Cr": "" },
+  { "First Name": "Stephon", "Last Name": "Castle", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "13,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Williams", "Position": "Forward", "Team": "Oklahoma City Thunder", "Cr 26/27": "13,0", "Cr": "" },
+  { "First Name": "Ja", "Last Name": "Morant", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "13,0", "Cr": "" },
+  { "First Name": "Darryn", "Last Name": "Peterson", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Lauri", "Last Name": "Markkanen", "Position": "Forward", "Team": "Utah Jazz", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Jarrett", "Last Name": "Allen", "Position": "Center", "Team": "Cleveland Cavaliers", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Cameron", "Last Name": "Boozer", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Og", "Last Name": "Anunoby", "Position": "Forward", "Team": "New York Knicks", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Pascal", "Last Name": "Siakam", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Ivica", "Last Name": "Zubac", "Position": "Center", "Team": "Indiana Pacers", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Zion", "Last Name": "Williamson", "Position": "Forward", "Team": "New Orleans Pelicans", "Cr 26/27": "12,5", "Cr": "" },
+  { "First Name": "Kyrie", "Last Name": "Irving", "Position": "Guard", "Team": "Dallas Mavericks", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Dyson", "Last Name": "Daniels", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Onyeka", "Last Name": "Okongwu", "Position": "Center", "Team": "Atlanta Hawks", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Tyler", "Last Name": "Herro", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Dejounte", "Last Name": "Murray", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Josh", "Last Name": "Hart", "Position": "Forward", "Team": "New York Knicks", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Franz", "Last Name": "Wagner", "Position": "Forward", "Team": "Orlando Magic", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Vj", "Last Name": "Edgecombe", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Jaren", "Last Name": "Jackson Jr", "Position": "Forward", "Team": "Utah Jazz", "Cr 26/27": "12,0", "Cr": "" },
+  { "First Name": "Payton", "Last Name": "Pritchard", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "11,5", "Cr": "" },
+  { "First Name": "Paul", "Last Name": "George", "Position": "Forward", "Team": "Boston Celtics", "Cr 26/27": "11,5", "Cr": "" },
+  { "First Name": "Trey", "Last Name": "Murphy III", "Position": "Forward", "Team": "New Orleans Pelicans", "Cr 26/27": "11,5", "Cr": "" },
+  { "First Name": "Ryan", "Last Name": "Rollins", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "11,5", "Cr": "" },
+  { "First Name": "Rudy", "Last Name": "Gobert", "Position": "Center", "Team": "Minnesota Timberwolves", "Cr 26/27": "11,5", "Cr": "" },
+  { "First Name": "Desmond", "Last Name": "Bane", "Position": "Guard", "Team": "Orlando Magic", "Cr 26/27": "11,5", "Cr": "" },
+  { "First Name": "Keyonte", "Last Name": "George", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "11,5", "Cr": "" },
+  { "First Name": "Nickeil", "Last Name": "Alexander-Walker", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Mike", "Last Name": "Brown", "Position": "Head Coach", "Team": "New York Knicks", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Mark", "Last Name": "Daigneault", "Position": "Head Coach", "Team": "Oklahoma City Thunder", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Mitch", "Last Name": "Johnson", "Position": "Head Coach", "Team": "San Antonio Spurs", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Neemias", "Last Name": "Queta", "Position": "Center", "Team": "Boston Celtics", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Brandon", "Last Name": "Miller", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Kon", "Last Name": "Knueppel", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Matas", "Last Name": "Buzelis", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "De'Aaron", "Last Name": "Fox", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Miles", "Last Name": "Bridges", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "11,0", "Cr": "" },
+  { "First Name": "Derrick", "Last Name": "White", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Brandin", "Last Name": "Podziemski", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Jabari", "Last Name": "Smith Jr", "Position": "Forward", "Team": "Houston Rockets", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Andrew", "Last Name": "Wiggins", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Hartenstein", "Position": "Center", "Team": "Oklahoma City Thunder", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Tobias", "Last Name": "Harris", "Position": "Forward", "Team": "San Antonio Spurs", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Nick", "Last Name": "Nurse", "Position": "Head Coach", "Team": "Philadelphia 76ers", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Walker", "Last Name": "Kessler", "Position": "Center", "Team": "Los Angeles Lakers", "Cr 26/27": "10,5", "Cr": "" },
+  { "First Name": "Nikola", "Last Name": "Vucevic", "Position": "Center", "Team": "Orlando Magic", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Kel'el", "Last Name": "Ware", "Position": "Center", "Team": "Milwaukee Bucks", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "CJ", "Last Name": "Mccollum", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Moussa", "Last Name": "Diabate", "Position": "Center", "Team": "Charlotte Hornets", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Ausar", "Last Name": "Thompson", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Andrew", "Last Name": "Nembhard", "Position": "Guard", "Team": "Indiana Pacers", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Brandon", "Last Name": "Ingram", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Kevin", "Last Name": "Porter Jr", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Ayo", "Last Name": "Dosunmu", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Wendell", "Last Name": "Carter Jr", "Position": "Center", "Team": "Orlando Magic", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Maxime", "Last Name": "Raynaud", "Position": "Center", "Team": "Sacramento Kings", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Devin", "Last Name": "Vassell", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Dylan", "Last Name": "Harper", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "RJ", "Last Name": "Barrett", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Immanuel", "Last Name": "Quickley", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Jusuf", "Last Name": "Nurkic", "Position": "Center", "Team": "Utah Jazz", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Fred", "Last Name": "Vanvleet", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "David", "Last Name": "Adelman", "Position": "Head Coach", "Team": "Denver Nuggets", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Chris", "Last Name": "Finch", "Position": "Head Coach", "Team": "Minnesota Timberwolves", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Naz", "Last Name": "Reid", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "10,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Green", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Mark", "Last Name": "Williams", "Position": "Center", "Team": "Phoenix Suns", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Nicolas", "Last Name": "Claxton", "Position": "Center", "Team": "Chicago Bulls", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "John", "Last Name": "Collins", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Jimmy", "Last Name": "Butler", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Cam", "Last Name": "Spencer", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Jaden", "Last Name": "Mcdaniels", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Saddiq", "Last Name": "Bey", "Position": "Forward", "Team": "New Orleans Pelicans", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Mikal", "Last Name": "Bridges", "Position": "Forward", "Team": "New York Knicks", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Toumani", "Last Name": "Camara", "Position": "Forward", "Team": "Portland Trail Blazers", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Julian", "Last Name": "Champagnie", "Position": "Forward", "Team": "San Antonio Spurs", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Jakob", "Last Name": "Poeltl", "Position": "Center", "Team": "Toronto Raptors", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Deandre", "Last Name": "Ayton", "Position": "Center", "Team": "Washington Wizards", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Kenny", "Last Name": "Atkinson", "Position": "Head Coach", "Team": "Cleveland Cavaliers", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "J.B.", "Last Name": "Bickerstaff", "Position": "Head Coach", "Team": "Detroit Pistons", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Kyle", "Last Name": "Filipowski", "Position": "Center", "Team": "Utah Jazz", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Kristaps", "Last Name": "Porzingis", "Position": "Center", "Team": "Golden State Warriors", "Cr 26/27": "9,5", "Cr": "" },
+  { "First Name": "Coby", "Last Name": "White", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Davion", "Last Name": "Mitchell", "Position": "Guard", "Team": "Miami Heat", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Jaime", "Last Name": "Jaquez Jr", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Suggs", "Position": "Guard", "Team": "Orlando Magic", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Tre", "Last Name": "Jones", "Position": "Guard", "Team": "Chicago Bulls", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Daniel", "Last Name": "Gafford", "Position": "Center", "Team": "Dallas Mavericks", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "P.J.", "Last Name": "Washington", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Demar", "Last Name": "Derozan", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Cameron", "Last Name": "Johnson", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Gui", "Last Name": "Santos", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Yaxel", "Last Name": "Lendeborg", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Myles", "Last Name": "Turner", "Position": "Center", "Team": "Milwaukee Bucks", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Derik", "Last Name": "Queen", "Position": "Center", "Team": "New Orleans Pelicans", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Collin", "Last Name": "Gillespie", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Dillon", "Last Name": "Brooks", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Jrue", "Last Name": "Holiday", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Precious", "Last Name": "Achiuwa", "Position": "Forward", "Team": "Sacramento Kings", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Darius", "Last Name": "Acuff Jr", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Zach", "Last Name": "Edey", "Position": "Center", "Team": "Memphis Grizzlies", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Ime", "Last Name": "Udoka", "Position": "Head Coach", "Team": "Houston Rockets", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Erik", "Last Name": "Spoelstra", "Position": "Head Coach", "Team": "Miami Heat", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Norman", "Last Name": "Powell", "Position": "Guard", "Team": "Chicago Bulls", "Cr 26/27": "9,0", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "Poole", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Jeremiah", "Last Name": "Fears", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Collin", "Last Name": "Murray-boyles", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Mikel", "Last Name": "Brown Jr.", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Peyton", "Last Name": "Watson", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Aaron", "Last Name": "Gordon", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Christian", "Last Name": "Braun", "Position": "Guard", "Team": "Denver Nuggets", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Tari", "Last Name": "Eason", "Position": "Forward", "Team": "Houston Rockets", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Jerami", "Last Name": "Grant", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Cason", "Last Name": "Wallace", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Ace", "Last Name": "Bailey", "Position": "Forward", "Team": "Utah Jazz", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Collier", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Dereck", "Last Name": "Lively II", "Position": "Center", "Team": "Dallas Mavericks", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Quin", "Last Name": "Snyder", "Position": "Head Coach", "Team": "Atlanta Hawks", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Rick", "Last Name": "Carlisle", "Position": "Head Coach", "Team": "Indiana Pacers", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Rui", "Last Name": "Hachimura", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Alex", "Last Name": "Sarr", "Position": "Center", "Team": "Washington Wizards", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Day'ron", "Last Name": "Sharpe", "Position": "Center", "Team": "Brooklyn Nets", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Bradley", "Last Name": "Beal", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "8,5", "Cr": "" },
+  { "First Name": "Dennis", "Last Name": "Schroder", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "8,2", "Cr": "" },
+  { "First Name": "Shaedon", "Last Name": "Sharpe", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Kelly", "Last Name": "Oubre Jr", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Keaton", "Last Name": "Wagler", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Santi", "Last Name": "Aldama", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Royce", "Last Name": "O'Neale", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Ajay", "Last Name": "Mitchell", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Brice", "Last Name": "Sensabaugh", "Position": "Forward", "Team": "Utah Jazz", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Carlton", "Last Name": "Carrington", "Position": "Guard", "Team": "Washington Wizards", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Cedric", "Last Name": "Coward", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Donte", "Last Name": "DiVincenzo", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Naji", "Last Name": "Marshall", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Draymond", "Last Name": "Green", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Brook", "Last Name": "Lopez", "Position": "Center", "Team": "Los Angeles Clippers", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Bobby", "Last Name": "Portis", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Bennedict", "Last Name": "Mathurin", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Robert", "Last Name": "Williams III", "Position": "Center", "Team": "Portland Trail Blazers", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Bilal", "Last Name": "Coulibaly", "Position": "Guard", "Team": "Washington Wizards", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Kyshawn", "Last Name": "George", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Scotty", "Last Name": "Pippen Jr", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "JJ", "Last Name": "Redick", "Position": "Head Coach", "Team": "Los Angeles Lakers", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Joe", "Last Name": "Mazzulla", "Position": "Head Coach", "Team": "Boston Celtics", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Darko", "Last Name": "Rajakovic", "Position": "Head Coach", "Team": "Toronto Raptors", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Keegan", "Last Name": "Murray", "Position": "Forward", "Team": "Sacramento Kings", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Anfernee", "Last Name": "Simons", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "8,0", "Cr": "" },
+  { "First Name": "Oso", "Last Name": "Ighodaro", "Position": "Center", "Team": "Phoenix Suns", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Ryan", "Last Name": "Kalkbrenner", "Position": "Center", "Team": "Charlotte Hornets", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Leonard", "Last Name": "Miller", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Jarace", "Last Name": "Walker", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Olivier", "Last Name": "Maxence-Prosper", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Cody", "Last Name": "Williams", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Max", "Last Name": "Christie", "Position": "Guard", "Team": "Dallas Mavericks", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Kingston", "Last Name": "Flemings", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Aaron", "Last Name": "Nesmith", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Morez", "Last Name": "Johnson", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Duncan", "Last Name": "Robinson", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Moses", "Last Name": "Moody", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Reed", "Last Name": "Sheppard", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Kris", "Last Name": "Dunn", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Collin", "Last Name": "Sexton", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Sandro", "Last Name": "Mamukelashvili", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Pelle", "Last Name": "Larsson", "Position": "Guard", "Team": "Miami Heat", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "A.J.", "Last Name": "Green", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Luke", "Last Name": "Kennard", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Zach", "Last Name": "Lavine", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Justin", "Last Name": "Champagnie", "Position": "Guard", "Team": "Washington Wizards", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Ty", "Last Name": "Jerome", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Jason", "Last Name": "Kidd", "Position": "Head Coach", "Team": "Dallas Mavericks", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Jamahl", "Last Name": "Mosley", "Position": "Head Coach", "Team": "Orlando Magic", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Tiago", "Last Name": "Splitter", "Position": "Head Coach", "Team": "Portland Trail Blazers", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Brian", "Last Name": "Keefe", "Position": "Head Coach", "Team": "Washington Wizards", "Cr 26/27": "7,5", "Cr": "" },
+  { "First Name": "Quentin", "Last Name": "Grimes", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jay", "Last Name": "Huff", "Position": "Center", "Team": "Indiana Pacers", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Sam", "Last Name": "Hauser", "Position": "Forward", "Team": "Boston Celtics", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Brandon", "Last Name": "Williams", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Oscar", "Last Name": "Tshiebwe", "Position": "Center", "Team": "Houston Rockets", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "T.J.", "Last Name": "Mcconnell", "Position": "Guard", "Team": "Indiana Pacers", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jericho", "Last Name": "Sims", "Position": "Center", "Team": "Milwaukee Bucks", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Will", "Last Name": "Riley", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Marvin", "Last Name": "Bagley III", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Grayson", "Last Name": "Allen", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Hannes", "Last Name": "Steinbach", "Position": "Center", "Team": "Charlotte Hornets", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Smith", "Position": "Center", "Team": "Chicago Bulls", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Gary", "Last Name": "Payton II", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "De'Anthony", "Last Name": "Melton", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Marcus", "Last Name": "Smart", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "Miller", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Gregory", "Last Name": "Jackson", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jaylen", "Last Name": "Wells", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Kyle", "Last Name": "Kuzma", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Brayden", "Last Name": "Burries", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Nate", "Last Name": "Ament", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jonathan", "Last Name": "Kuminga", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Anthony", "Last Name": "Black", "Position": "Guard", "Team": "Orlando Magic", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "Goodwin", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Nique", "Last Name": "Clifford", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Ja'kobe", "Last Name": "Walter", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jake", "Last Name": "Laravia", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Doc", "Last Name": "Rivers", "Position": "Head Coach", "Team": "Milwaukee Bucks", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Charles", "Last Name": "Lee", "Position": "Head Coach", "Team": "Charlotte Hornets", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Steve", "Last Name": "Kerr", "Position": "Head Coach", "Team": "Golden State Warriors", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "Ott", "Position": "Head Coach", "Team": "Phoenix Suns", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Ousmane", "Last Name": "Dieng", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Yves", "Last Name": "Missi", "Position": "Center", "Team": "New Orleans Pelicans", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Aday", "Last Name": "Mara", "Position": "Center", "Team": "Oklahoma City Thunder", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Keldon", "Last Name": "Johnson", "Position": "Forward", "Team": "San Antonio Spurs", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Julian", "Last Name": "Reese", "Position": "Forward", "Team": "New Orleans Pelicans", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Keon", "Last Name": "Ellis", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "7,0", "Cr": "" },
+  { "First Name": "Micah", "Last Name": "Potter", "Position": "Center", "Team": "Portland Trail Blazers", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Noah", "Last Name": "Clowney", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Al", "Last Name": "Horford", "Position": "Center", "Team": "Golden State Warriors", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Slawson", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Derrick", "Last Name": "Jones Jr", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Javon", "Last Name": "Small", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Tim", "Last Name": "Hardaway Jr", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Alex", "Last Name": "Caruso", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Scoot", "Last Name": "Henderson", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Malik", "Last Name": "Monk", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Dylan", "Last Name": "Cardwell", "Position": "Center", "Team": "Sacramento Kings", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Malachi", "Last Name": "Smith", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Jamal", "Last Name": "Shead", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Stewart", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "De'Andre", "Last Name": "Hunter", "Position": "Forward", "Team": "Sacramento Kings", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Herbert", "Last Name": "Jones", "Position": "Forward", "Team": "New Orleans Pelicans", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Billy", "Last Name": "Donovan", "Position": "Head Coach", "Team": "Chicago Bulls", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Tyronn", "Last Name": "Lue", "Position": "Head Coach", "Team": "Los Angeles Clippers", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Will", "Last Name": "Hardy", "Position": "Head Coach", "Team": "Utah Jazz", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "James", "Last Name": "Borrego", "Position": "Head Coach", "Team": "New Orleans Pelicans", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Mitchell", "Last Name": "Robinson", "Position": "Center", "Team": "Boston Celtics", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Aaron", "Last Name": "Wiggins", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "Walsh", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Nikola", "Last Name": "Jovic", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Jose", "Last Name": "Alvarado", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Miles", "Last Name": "McBride", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Adem", "Last Name": "Bona", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Jeremy", "Last Name": "Sochan", "Position": "Forward", "Team": "Portland Trail Blazers", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Kevin", "Last Name": "Huerter", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "6,5", "Cr": "" },
+  { "First Name": "Jared", "Last Name": "Mccain", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "6,2", "Cr": "" },
+  { "First Name": "Devin", "Last Name": "Carter", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Daniss", "Last Name": "Jenkins", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Paul", "Last Name": "Reed", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Taurean", "Last Name": "Prince", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Sharife", "Last Name": "Cooper", "Position": "Guard", "Team": "Washington Wizards", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Baylor", "Last Name": "Scheierman", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Jock", "Last Name": "Landale", "Position": "Center", "Team": "Atlanta Hawks", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Egor", "Last Name": "Demin", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Danny", "Last Name": "Wolf", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Bruce", "Last Name": "Brown", "Position": "Guard", "Team": "Denver Nuggets", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Obi", "Last Name": "Toppin", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Kobe", "Last Name": "Brown", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Max", "Last Name": "Strus", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Klay", "Last Name": "Thompson", "Position": "Guard", "Team": "Miami Heat", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Kasparas", "Last Name": "Jakucionis", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Ben", "Last Name": "Simmons", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Andre", "Last Name": "Drummond", "Position": "Center", "Team": "New York Knicks", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Jaylin", "Last Name": "Williams", "Position": "Forward", "Team": "Oklahoma City Thunder", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Goga", "Last Name": "Bitadze", "Position": "Center", "Team": "Orlando Magic", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Tristan", "Last Name": "Da Silva", "Position": "Forward", "Team": "Orlando Magic", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Bez", "Last Name": "Mbeng", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Jaxson", "Last Name": "Hayes", "Position": "Center", "Team": "Utah Jazz", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Anthony", "Last Name": "Gill", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Khris", "Last Name": "Middleton", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Taylor", "Last Name": "Hendricks", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Joe", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Carter", "Last Name": "Bryant", "Position": "Forward", "Team": "San Antonio Spurs", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Jordi", "Last Name": "Fernandez", "Position": "Head Coach", "Team": "Brooklyn Nets", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Tuomas", "Last Name": "Iisalo", "Position": "Head Coach", "Team": "Memphis Grizzlies", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Doug", "Last Name": "Christie", "Position": "Head Coach", "Team": "Sacramento Kings", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Luguentz", "Last Name": "Dort", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Hugo", "Last Name": "Gonzalez", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Michael", "Last Name": "Ajayi", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Steven", "Last Name": "Adams", "Position": "Center", "Team": "Houston Rockets", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Bogdan", "Last Name": "Bogdanovic", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "Clarkson", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Ebuka", "Last Name": "Okorie", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Mike", "Last Name": "Conley", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Simone", "Last Name": "Fontecchio", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Meleek", "Last Name": "Thomas", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Svi", "Last Name": "Mykhailiuk", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "6,0", "Cr": "" },
+  { "First Name": "Sergio", "Last Name": "De Larrea", "Position": "Guard", "Team": "Dallas Mavericks", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Ryan", "Last Name": "Nembhard", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Nolan", "Last Name": "Traore", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Chaney", "Last Name": "Johnson", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "E.J.", "Last Name": "Liddell", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Ben", "Last Name": "Saraf", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Isaac", "Last Name": "Okoro", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Dailyn", "Last Name": "Swain", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Sam", "Last Name": "Merrill", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Quenton", "Last Name": "Jackson", "Position": "Guard", "Team": "Indiana Pacers", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Ziaire", "Last Name": "Williams", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Karim", "Last Name": "Lopez", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Karlo", "Last Name": "Matkovic", "Position": "Forward", "Team": "New Orleans Pelicans", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Bennett", "Last Name": "Stirtz", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Jayden", "Last Name": "Quaintance", "Position": "Forward", "Team": "San Antonio Spurs", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Tre", "Last Name": "Johnson", "Position": "Guard", "Team": "Washington Wizards", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Jamir", "Last Name": "Watkins", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Cameron", "Last Name": "Carr", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Patrick", "Last Name": "Williams", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Zaccharie", "Last Name": "Risacher", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Clint", "Last Name": "Capela", "Position": "Center", "Team": "Houston Rockets", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Caleb", "Last Name": "Love", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "5,5", "Cr": "" },
+  { "First Name": "Gabe", "Last Name": "Vincent", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "5,2", "Cr": "" },
+  { "First Name": "Gradey", "Last Name": "Dick", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Mario", "Last Name": "Hezonja", "Position": "Forward", "Team": "Cleveland Cavaliers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Chris", "Last Name": "Cenac Jr.", "Position": "Forward", "Team": "Boston Celtics", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Josh", "Last Name": "Minott", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Terance", "Last Name": "Mann", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Christian", "Last Name": "Anderson", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Spencer", "Last Name": "Jones", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Elijah", "Last Name": "Harkless", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Charles", "Last Name": "Bassey", "Position": "Center", "Team": "Golden State Warriors", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Ben", "Last Name": "Sheppard", "Position": "Guard", "Team": "Indiana Pacers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Kobe", "Last Name": "Sanders", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Jackson", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Jaden", "Last Name": "Hardy", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Walter", "Last Name": "Clayton Jr.", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Jahmai", "Last Name": "Mashack", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Nick", "Last Name": "Richards", "Position": "Center", "Team": "Miami Heat", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Caris", "Last Name": "Levert", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Pete", "Last Name": "Nance", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "Hawkins", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Landry", "Last Name": "Shamet", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Dominick", "Last Name": "Barlow", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Dean", "Last Name": "Wade", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Labaron", "Last Name": "Philon", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Pat", "Last Name": "Spencer", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Luke", "Last Name": "Kornet", "Position": "Center", "Team": "San Antonio Spurs", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Blake", "Last Name": "Hinson", "Position": "Forward", "Team": "Utah Jazz", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Tristan", "Last Name": "Vukcevic", "Position": "Forward", "Team": "Washington Wizards", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Bronny", "Last Name": "James", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "D'angelo", "Last Name": "Russell", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Johni", "Last Name": "Broome", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Josh", "Last Name": "Green", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "5,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Wilson", "Position": "Forward", "Team": "Atlanta Hawks", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Zuby", "Last Name": "Ejiofor", "Position": "Forward", "Team": "Atlanta Hawks", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Luka", "Last Name": "Garza", "Position": "Center", "Team": "Boston Celtics", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Joshua", "Last Name": "Jefferson", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Grant", "Last Name": "Williams", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Sion", "Last Name": "James", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Rob", "Last Name": "Dillingham", "Position": "Guard", "Team": "Chicago Bulls", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Jaylon", "Last Name": "Tyson", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Dwight", "Last Name": "Powell", "Position": "Center", "Team": "Dallas Mavericks", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Moussa", "Last Name": "Cisse", "Position": "Center", "Team": "Dallas Mavericks", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Georges", "Last Name": "Niang", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Kevon", "Last Name": "Looney", "Position": "Center", "Team": "Los Angeles Lakers", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Quinten", "Last Name": "Post", "Position": "Center", "Team": "Memphis Grizzlies", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Dru", "Last Name": "Smith", "Position": "Guard", "Team": "Miami Heat", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Kam", "Last Name": "Jones", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Gary", "Last Name": "Trent Jr", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Terrence", "Last Name": "Shannon", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Micah", "Last Name": "Peavy", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Jamal", "Last Name": "Cain", "Position": "Forward", "Team": "Orlando Magic", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Rayan", "Last Name": "Rupert", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Koa", "Last Name": "Peat", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Sidy", "Last Name": "Cissoko", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Alex", "Last Name": "Karaban", "Position": "Forward", "Team": "Sacramento Kings", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Tarris", "Last Name": "Reed Jr", "Position": "Center", "Team": "San Antonio Spurs", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Allen", "Last Name": "Graves", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Alijah", "Last Name": "Martin", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Nate", "Last Name": "Bittle", "Position": "Center", "Team": "Toronto Raptors", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Jaden", "Last Name": "Bradley", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Kevin", "Last Name": "Love", "Position": "Forward", "Team": "Utah Jazz", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Tamar", "Last Name": "Bates", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Felix", "Last Name": "Okpara", "Position": "Center", "Team": "Washington Wizards", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Tre", "Last Name": "Mann", "Position": "Guard", "Team": "Washington Wizards", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Trey", "Last Name": "Alexander", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "4,5", "Cr": "" },
+  { "First Name": "Tony", "Last Name": "Bradley", "Position": "Center", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Keaton", "Last Name": "Wallace", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Buddy", "Last Name": "Hield", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Asa", "Last Name": "Newell", "Position": "Forward", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Mouhamed", "Last Name": "Gueye", "Position": "Forward", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Corey", "Last Name": "Kispert", "Position": "Forward", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Rayj", "Last Name": "Dennis", "Position": "Guard", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Henri", "Last Name": "Veesaar", "Position": "Center", "Team": "Atlanta Hawks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Max", "Last Name": "Shulga", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Amari", "Last Name": "Williams", "Position": "Forward", "Team": "Boston Celtics", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ron", "Last Name": "Harper Jr.", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Dillon", "Last Name": "Mitchell", "Position": "Forward", "Team": "Boston Celtics", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Milos", "Last Name": "Uzan", "Position": "Guard", "Team": "Boston Celtics", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Drake", "Last Name": "Powell", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Moritz", "Last Name": "Wagner", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tyler", "Last Name": "Bilodeau", "Position": "Forward", "Team": "Brooklyn Nets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kylan", "Last Name": "Boswell", "Position": "Guard", "Team": "Brooklyn Nets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Dorian", "Last Name": "Finney-Smith", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Antonio", "Last Name": "Reeves", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Pj", "Last Name": "Hall", "Position": "Center", "Team": "Charlotte Hornets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Pat", "Last Name": "Connaughton", "Position": "Guard", "Team": "Charlotte Hornets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Xavier", "Last Name": "Tillman", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tidjane", "Last Name": "Salaun", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Liam", "Last Name": "Mcneeley", "Position": "Forward", "Team": "Charlotte Hornets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Zach", "Last Name": "Collins", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Noa", "Last Name": "Essengue", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tobe", "Last Name": "Awaka", "Position": "Forward", "Team": "Chicago Bulls", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Thomas", "Last Name": "Bryant", "Position": "Center", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Craig", "Last Name": "Porter", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tyrese", "Last Name": "Proctor", "Position": "Guard", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Nae'qwan", "Last Name": "Tomlin", "Position": "Forward", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Riley", "Last Name": "Minix", "Position": "Forward", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tristan", "Last Name": "Enaruna", "Position": "Forward", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ernest", "Last Name": "Udeh Jr.", "Position": "Center", "Team": "Cleveland Cavaliers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Marcus", "Last Name": "Sasser", "Position": "Guard", "Team": "Dallas Mavericks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jett", "Last Name": "Howard", "Position": "Guard", "Team": "Dallas Mavericks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Caleb", "Last Name": "Martin", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "John", "Last Name": "Poulakidas", "Position": "Guard", "Team": "Dallas Mavericks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tobias", "Last Name": "Lawal", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tarik", "Last Name": "Biberovic", "Position": "Forward", "Team": "Dallas Mavericks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Vsevolod", "Last Name": "Ishchenko", "Position": "Guard", "Team": "Dallas Mavericks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Julian", "Last Name": "Strawther", "Position": "Guard", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tyus", "Last Name": "Jones", "Position": "Guard", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Daron", "Last Name": "Holmes II", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Zeke", "Last Name": "Nnaji", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kj", "Last Name": "Simpson", "Position": "Guard", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "David", "Last Name": "Roddy", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Curtis", "Last Name": "Jones", "Position": "Guard", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Trevon", "Last Name": "Brazile", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Alpha", "Last Name": "Diallo", "Position": "Forward", "Team": "Denver Nuggets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Isaac", "Last Name": "Jones", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ron", "Last Name": "Holland II", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Gary", "Last Name": "Harris", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Wendell", "Last Name": "Moore", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Chaz", "Last Name": "Lanier", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Javonte", "Last Name": "Green", "Position": "Guard", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tolu", "Last Name": "Smith", "Position": "Forward", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ugonna", "Last Name": "Onyenso", "Position": "Center", "Team": "Detroit Pistons", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Will", "Last Name": "Richard", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Nate", "Last Name": "Williams", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Alex", "Last Name": "Toohey", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Seth", "Last Name": "Curry", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "LJ", "Last Name": "Cryer", "Position": "Guard", "Team": "Golden State Warriors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Lajae", "Last Name": "Jones", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Malevy", "Last Name": "Leons", "Position": "Forward", "Team": "Golden State Warriors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Julian", "Last Name": "Phillips", "Position": "Forward", "Team": "Houston Rockets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jae'Sean", "Last Name": "Tate", "Position": "Forward", "Team": "Houston Rockets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jeff", "Last Name": "Green", "Position": "Forward", "Team": "Houston Rockets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Crawford", "Position": "Forward", "Team": "Houston Rockets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Sean", "Last Name": "Pedulla", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Bruce", "Last Name": "Thornton", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Quadir", "Last Name": "Copeland", "Position": "Guard", "Team": "Houston Rockets", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Johnny", "Last Name": "Furphy", "Position": "Guard", "Team": "Indiana Pacers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Larry", "Last Name": "Nance Jr", "Position": "Forward", "Team": "Indiana Pacers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Braden", "Last Name": "Smith", "Position": "Guard", "Team": "Indiana Pacers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Yuki", "Last Name": "Kawamura", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "TyTy", "Last Name": "Washington", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Yanic Konan", "Last Name": "Niederhauser", "Position": "Center", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Cam", "Last Name": "Christie", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jalen", "Last Name": "Pickett", "Position": "Guard", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Nicolas", "Last Name": "Batum", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jamarion", "Last Name": "Sharp", "Position": "Center", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Norchad", "Last Name": "Omier", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Baba", "Last Name": "Miller", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Nick", "Last Name": "Martinelli", "Position": "Forward", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Narcisse", "Last Name": "Ngoy", "Position": "Center", "Team": "Los Angeles Clippers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Matisse", "Last Name": "Thybulle", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Adou", "Last Name": "Thiero", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jarred", "Last Name": "Vanderbilt", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Dalton", "Last Name": "Knecht", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Chris", "Last Name": "Manon", "Position": "Guard", "Team": "Los Angeles Lakers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "AK", "Last Name": "Okereke", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Arthur", "Last Name": "Kaluma", "Position": "Forward", "Team": "Los Angeles Lakers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Aj", "Last Name": "Johnson", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kris", "Last Name": "Murray", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Taj", "Last Name": "Gibson", "Position": "Forward", "Team": "Memphis Grizzlies", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Richie", "Last Name": "Saunders", "Position": "Guard", "Team": "Memphis Grizzlies", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Keshad", "Last Name": "Johnson", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jahmir", "Last Name": "Young", "Position": "Guard", "Team": "Miami Heat", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Myron", "Last Name": "Gardner", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Trevor", "Last Name": "Keels", "Position": "Guard", "Team": "Miami Heat", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ryan", "Last Name": "Conwell", "Position": "Guard", "Team": "Miami Heat", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tre", "Last Name": "Donaldson", "Position": "Forward", "Team": "Miami Heat", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Vladislav", "Last Name": "Goldin", "Position": "Center", "Team": "Miami Heat", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Thanasis", "Last Name": "Antetokounmpo", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Bogoljub", "Last Name": "Markovic", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Cormac", "Last Name": "Ryan", "Position": "Guard", "Team": "Milwaukee Bucks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Malique", "Last Name": "Lewis", "Position": "Forward", "Team": "Milwaukee Bucks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Nah'shon", "Last Name": "Hyland", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jaylen", "Last Name": "Clark", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Joan", "Last Name": "Beringer", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Enrique", "Last Name": "Freeman", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Trey", "Last Name": "Kaufman-Renn", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Zyon", "Last Name": "Pullin", "Position": "Guard", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Evans", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Trey", "Last Name": "Lyles", "Position": "Forward", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Rocco", "Last Name": "Zikarsky", "Position": "Center", "Team": "Minnesota Timberwolves", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Caleb", "Last Name": "Houstan", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Deandre", "Last Name": "Jordan", "Position": "Center", "Team": "New Orleans Pelicans", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Christian", "Last Name": "Koloko", "Position": "Center", "Team": "New Orleans Pelicans", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Bryce", "Last Name": "McGowens", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Trendon", "Last Name": "Watford", "Position": "Forward", "Team": "New Orleans Pelicans", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kobe", "Last Name": "Bufkin", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jaron", "Last Name": "Pierre Jr", "Position": "Guard", "Team": "New Orleans Pelicans", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Pacome", "Last Name": "Dadiet", "Position": "Forward", "Team": "New York Knicks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kevin", "Last Name": "Mccullar Jr", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tyler", "Last Name": "Kolek", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Mohamed", "Last Name": "Diawara", "Position": "Forward", "Team": "New York Knicks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Dillon", "Last Name": "Jones", "Position": "Forward", "Team": "New York Knicks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jack", "Last Name": "Kayil", "Position": "Guard", "Team": "New York Knicks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tyler", "Last Name": "Nickel", "Position": "Forward", "Team": "New York Knicks", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kenrich", "Last Name": "Williams", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Brooks", "Last Name": "Barnhizer", "Position": "Forward", "Team": "Oklahoma City Thunder", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Nikola", "Last Name": "Topic", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Thomas", "Last Name": "Sorber", "Position": "Center", "Team": "Oklahoma City Thunder", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Otega", "Last Name": "Oweh", "Position": "Guard", "Team": "Oklahoma City Thunder", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jonathan", "Last Name": "Isaac", "Position": "Forward", "Team": "Orlando Magic", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jevon", "Last Name": "Carter", "Position": "Guard", "Team": "Orlando Magic", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jase", "Last Name": "Richardson", "Position": "Guard", "Team": "Orlando Magic", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Colin", "Last Name": "Castleton", "Position": "Center", "Team": "Orlando Magic", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Noah", "Last Name": "Penda", "Position": "Guard", "Team": "Orlando Magic", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Izaiyah", "Last Name": "Nelson", "Position": "Forward", "Team": "Orlando Magic", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Alex", "Last Name": "Morales", "Position": "Guard", "Team": "Orlando Magic", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kentavious", "Last Name": "Caldwell-Pope", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kyle", "Last Name": "Lowry", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Justin", "Last Name": "Edwards", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Marjon", "Last Name": "Beauchamp", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Tyrese", "Last Name": "Martin", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jabari", "Last Name": "Walker", "Position": "Forward", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ariel", "Last Name": "Hukporti", "Position": "Center", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Duke", "Last Name": "Miles", "Position": "Guard", "Team": "Philadelphia 76ers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ryan", "Last Name": "Dunn", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Amir", "Last Name": "Coffey", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Haywood", "Last Name": "Highsmith", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Khaman", "Last Name": "Maluach", "Position": "Center", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jamaree", "Last Name": "Bouyea", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Isaiah", "Last Name": "Livers", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Rasheer", "Last Name": "Fleming", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Koby", "Last Name": "Brea", "Position": "Guard", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "CJ", "Last Name": "Huntley", "Position": "Forward", "Team": "Phoenix Suns", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Blake", "Last Name": "Wesley", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Chris", "Last Name": "Youngblood", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Branden", "Last Name": "Carlson", "Position": "Center", "Team": "Portland Trail Blazers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Yang", "Last Name": "Hansen", "Position": "Center", "Team": "Portland Trail Blazers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Vit", "Last Name": "Krejci", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "John", "Last Name": "Tonje", "Position": "Guard", "Team": "Portland Trail Blazers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jayson", "Last Name": "Kent", "Position": "Forward", "Team": "Portland Trail Blazers", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jonathan", "Last Name": "Mogbo", "Position": "Forward", "Team": "Sacramento Kings", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Adam", "Last Name": "Flagler", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Daeqwon", "Last Name": "Plowden", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Emanuel", "Last Name": "Sharp", "Position": "Guard", "Team": "Sacramento Kings", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Taelon", "Last Name": "Peter", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jordan", "Last Name": "McLaughlin", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "David Jones", "Last Name": "Garcia", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Harrison", "Last Name": "Barnes", "Position": "Forward", "Team": "San Antonio Spurs", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Ja'Kobi", "Last Name": "Gillespie", "Position": "Guard", "Team": "San Antonio Spurs", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Maliq", "Last Name": "Brown", "Position": "Forward", "Team": "San Antonio Spurs", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "A.j.", "Last Name": "Lawson", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Kyle", "Last Name": "Anderson", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Trayce", "Last Name": "Jackson-Davis", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Andre", "Last Name": "Jackson Jr", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Jamison", "Last Name": "Battle", "Position": "Forward", "Team": "Toronto Raptors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Chucky", "Last Name": "Hepburn", "Position": "Guard", "Team": "Toronto Raptors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Trey", "Last Name": "Jemison III", "Position": "Center", "Team": "Toronto Raptors", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Mo", "Last Name": "Bamba", "Position": "Center", "Team": "Utah Jazz", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Josh", "Last Name": "Okogie", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Harrison", "Last Name": "Ingram", "Position": "Forward", "Team": "Utah Jazz", "Cr 26/27": "4,0", "Cr": "" },
+  { "First Name": "Hayden", "Last Name": "Gray", "Position": "Guard", "Team": "Utah Jazz", "Cr 26/27": "4,0", "Cr": "" }
 ];
 
-// ---------------------------------------------------------
-// 2. CONVERSIONE AUTOMATICA PER L'APP
-// ---------------------------------------------------------
-const NBA_PLAYERS_DB = RAW_DUNKEST_DATA
-  .filter(p => p.Position && p.Position !== "Head Coach") // Rimuove gli allenatori
-  .map((p, index) => {
-    // Conversione del Ruolo
-    let role = 'G';
-    if (p.Position === 'Forward') role = 'F';
-    if (p.Position === 'Center') role = 'C';
+// Conversione del JSON per il motore dell'Asta
+const NBA_PLAYERS_DB = RAW_PLAYERS_JSON.map((p, index) => {
+  let role = 'G';
+  if (p.Position === 'Forward') role = 'F';
+  if (p.Position === 'Center') role = 'C';
+  if (p.Position === 'Head Coach') role = 'HC';
 
-    // Parsing del Prezzo (da "30,0" a 30.0)
-    const priceStr = p["Cr 26/27"] || "1,0";
-    const price = parseFloat(priceStr.replace(',', '.'));
+  // Legge valori come "30,0" e li converte in 30.0
+  const priceParsed = parseFloat(p["Cr 26/27"].replace(',', '.')) || 4.0;
 
-    return {
-      id: `p_${index}`,
-      name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
-      team: p["Team"],
-      role: role,
-      basePrice: price,
-      tier: p.Position // Usa la posizione intera come etichetta
-    };
-  });
+  return {
+    id: `p_${index}`,
+    name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
+    team: p.Team,
+    role: role,
+    basePrice: priceParsed,
+    tier: 'Standard'
+  };
+});
 
-
+// Funzioni Audio per timer e rilanci
 const playBuzzerSound = () => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -4903,7 +673,7 @@ const playBuzzerSound = () => {
     osc.start();
     osc.stop(ctx.currentTime + 0.4);
   } catch (e) {
-    // Audio might be blocked before first user gesture
+    // Audio blocked prima del click
   }
 };
 
@@ -4924,32 +694,27 @@ const playBidSound = () => {
   } catch (e) {}
 };
 
-// Dunkest default standard squad: 2 Guards, 2 Forwards, 1 Center + 5 Bench (2G, 2F, 1C) = 10 players
-const TOTAL_ROSTER_SIZE = 10;
+// --- NUOVO SCHEMA DUNKEST CHE INCLUDE L'ALLENATORE (11 Giocatori Totali) ---
+const TOTAL_ROSTER_SIZE = 11;
 const ROSTER_SLOT_SCHEMA = {
-  G: { starters: 2, bench: 2, total: 4 },
-  F: { starters: 2, bench: 2, total: 4 },
-  C: { starters: 1, bench: 1, total: 2 }
+  G: { total: 4 },
+  F: { total: 4 },
+  C: { total: 2 },
+  HC: { total: 1 } // Head Coach
 };
 
 const PHASES = [
-  { id: 'guardie_starters', name: '1. Guardie (Titolari)', allowedRoles: ['G'], isBench: false },
-  { id: 'ali_starters', name: '2. Ali (Titolari)', allowedRoles: ['F'], isBench: false },
-  { id: 'centri_starters', name: '3. Centri (Titolari)', allowedRoles: ['C'], isBench: false },
-  { id: 'riserve_libere', name: '4. Riserve (Chiamata Libera G/F/C)', allowedRoles: ['G', 'F', 'C'], isBench: true }
+  { id: 'guardie_starters', name: '1. Guardie (G)', allowedRoles: ['G'], isBench: false },
+  { id: 'ali_starters', name: '2. Ali (F)', allowedRoles: ['F'], isBench: false },
+  { id: 'centri_starters', name: '3. Centri (C)', allowedRoles: ['C'], isBench: false },
+  { id: 'coach_starters', name: '4. Allenatori (HC)', allowedRoles: ['HC'], isBench: false },
+  { id: 'riserve_libere', name: '5. Riserve (Asta Libera)', allowedRoles: ['G', 'F', 'C'], isBench: true }
 ];
 
 export default function App() {
   // Auth & Session
   const [user, setUser] = useState(null);
-  const [roomCode, setRoomCode] = useState(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      return (params.get('room') || 'DUNKEST25').toUpperCase();
-    } catch {
-      return 'DUNKEST25';
-    }
-  });
+  const [roomCode, setRoomCode] = useState('DUNKEST25');
   const [teamName, setTeamName] = useState('');
   const [managerName, setManagerName] = useState('');
   const [hasJoined, setHasJoined] = useState(false);
@@ -4968,10 +733,10 @@ export default function App() {
     timerSeconds: 20,
     isTimerPaused: false,
     activeCallerIndex: 0,
-    turnDirection: 'clockwise', // 'clockwise' or 'counter-clockwise'
-    currentAuction: null, // { player, currentBid, highBidderId, highBidderName, endsAt, bidHistory: [] }
-    participants: [], // array of { id, name, teamName, credits, roster: [], isAdmin }
-    boughtPlayers: [] // array of player ids already taken
+    turnDirection: 'clockwise',
+    currentAuction: null,
+    participants: [],
+    boughtPlayers: []
   });
 
   // Local Timer countdown representation
@@ -4997,11 +762,10 @@ export default function App() {
           await signInAnonymously(auth);
         }
       } catch (err) {
-        console.error("Auth initialization error, signing in anonymously:", err);
+        console.error("Auth init error:", err);
         try {
           await signInAnonymously(auth);
         } catch (e) {
-          console.warn("Local fallback offline mode active.");
           setUser({ uid: 'guest-' + Date.now(), isAnonymous: true });
         }
       }
@@ -5017,14 +781,15 @@ export default function App() {
   useEffect(() => {
     if (!db || !hasJoined) return;
 
-    const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+    const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${roomCode.toUpperCase()}`);
+
     const unsubscribe = onSnapshot(roomDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setRoomData(data);
       }
     }, (error) => {
-      console.warn("Firestore snapshot error (Falling back to local in-memory room):", error);
+      console.warn("Firestore error:", error);
     });
 
     return () => unsubscribe();
@@ -5080,7 +845,7 @@ export default function App() {
     };
 
     triggerStateUpdate(nextState);
-    showNotice(`🔥 ASSEGNATO! ${player.name} a ${roomData.currentAuction.highBidderName} per ${finalPrice} crediti!`);
+    showNotice(`🔥 ASSEGNATO! ${player.name} a ${roomData.currentAuction.highBidderName} per ${finalPrice} cr!`);
   };
 
   const getNextCallerIndex = (currentIndex, participantsList) => {
@@ -5105,7 +870,7 @@ export default function App() {
 
     if (db) {
       try {
-        const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+        const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${roomCode.toUpperCase()}`);
         await setDoc(roomDocRef, newState, { merge: true });
       } catch (err) {
         console.error("Firestore update failed:", err);
@@ -5120,10 +885,13 @@ export default function App() {
     const guards = participant.roster.filter(p => p.role === 'G').length;
     const forwards = participant.roster.filter(p => p.role === 'F').length;
     const centers = participant.roster.filter(p => p.role === 'C').length;
+    const coaches = participant.roster.filter(p => p.role === 'HC').length;
 
-    if (currentPhase.id === 'guardie_starters') return guards < 2;
-    if (currentPhase.id === 'ali_starters') return forwards < 2;
-    if (currentPhase.id === 'centri_starters') return centers < 1;
+    if (currentPhase.id === 'guardie_starters') return guards < ROSTER_SLOT_SCHEMA['G'].total;
+    if (currentPhase.id === 'ali_starters') return forwards < ROSTER_SLOT_SCHEMA['F'].total;
+    if (currentPhase.id === 'centri_starters') return centers < ROSTER_SLOT_SCHEMA['C'].total;
+    if (currentPhase.id === 'coach_starters') return coaches < ROSTER_SLOT_SCHEMA['HC'].total;
+    
     if (currentPhase.id === 'riserve_libere') {
       return participant.roster.length < TOTAL_ROSTER_SIZE;
     }
@@ -5133,7 +901,7 @@ export default function App() {
   const hasSpecificSlotForPlayer = (participant, playerRole) => {
     if (!participant) return false;
     const count = participant.roster.filter(p => p.role === playerRole).length;
-    const max = ROSTER_SLOT_SCHEMA[playerRole].total;
+    const max = ROSTER_SLOT_SCHEMA[playerRole]?.total || 0;
     return count < max;
   };
 
@@ -5147,28 +915,13 @@ export default function App() {
     return Math.max(0, participant.credits - futureSlots);
   };
 
-  const handleJoinOrCreate = async (asAdmin = false) => {
-    const cleanRoom = roomCode.trim().toUpperCase();
-    if (!cleanRoom) {
-      showNotice("Inserisci un codice stanza!");
-      return;
-    }
+  const handleJoinOrCreate = (asAdmin = false) => {
     if (!teamName.trim() || !managerName.trim()) {
       showNotice("Inserisci sia il tuo nome che il nome della tua franchigia Dunkest!");
       return;
     }
 
-    // Assicuriamoci di avere un ID utente univoco e stabile per questo dispositivo/browser
-    let currentUserId = user?.uid;
-    if (!currentUserId) {
-      currentUserId = localStorage.getItem('dunkest_user_id');
-      if (!currentUserId) {
-        currentUserId = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
-        localStorage.setItem('dunkest_user_id', currentUserId);
-      }
-      setUser({ uid: currentUserId, isAnonymous: true });
-    }
-
+    const currentUserId = user?.uid || `usr_${Date.now()}`;
     const newParticipant = {
       id: currentUserId,
       name: managerName.trim(),
@@ -5178,49 +931,9 @@ export default function App() {
       isAdmin: asAdmin
     };
 
-    // Se Firebase è attivo, leggiamo i dati reali dal database per NON sovrascrivere gli altri
-    if (db) {
-      try {
-        const roomDocRef = doc(db, 'rooms', cleanRoom);
-        const snap = await getDoc(roomDocRef);
-
-        let currentRoomData = { ...roomData };
-        if (snap.exists()) {
-          currentRoomData = snap.data();
-        }
-
-        const existingParticipants = currentRoomData.participants || [];
-        const existingIndex = existingParticipants.findIndex(p => p.id === currentUserId);
-        let updatedList = [...existingParticipants];
-
-        if (existingIndex >= 0) {
-          // Se lo stesso utente rientra o cambia nome
-          updatedList[existingIndex] = { ...updatedList[existingIndex], ...newParticipant };
-        } else {
-          // Nuovo utente: lo aggiungiamo in coda alla lista SENZA cancellare gli altri
-          updatedList.push(newParticipant);
-        }
-
-        const updatedState = {
-          ...currentRoomData,
-          code: cleanRoom,
-          participants: updatedList
-        };
-
-        await setDoc(roomDocRef, updatedState, { merge: true });
-        setRoomData(updatedState);
-        setIsAdmin(asAdmin);
-        setHasJoined(true);
-        showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}!`);
-        return;
-      } catch (err) {
-        console.error("Errore salvataggio ingresso stanza su Firebase:", err);
-      }
-    }
-
-    // Fallback locale in caso di assenza temporanea di rete
     const existingIndex = roomData.participants.findIndex(p => p.id === currentUserId);
     let updatedParticipants = [...roomData.participants];
+
     if (existingIndex >= 0) {
       updatedParticipants[existingIndex] = { ...updatedParticipants[existingIndex], ...newParticipant };
     } else {
@@ -5229,7 +942,7 @@ export default function App() {
 
     const updatedState = {
       ...roomData,
-      code: cleanRoom,
+      code: roomCode.toUpperCase(),
       participants: updatedParticipants
     };
 
@@ -5252,7 +965,7 @@ export default function App() {
     const startPrice = Math.max(1, parseInt(openingBid) || 1);
 
     if (startPrice > maxBid) {
-      showNotice(`Crediti insufficienti! La tua offerta massima consentita è ${maxBid} per poter completare il roster.`);
+      showNotice(`Crediti insufficienti! La tua offerta massima consentita è ${maxBid}.`);
       return;
     }
 
@@ -5305,7 +1018,7 @@ export default function App() {
 
     const maxAllowed = getMaxBidAllowed(currentParticipant);
     if (targetBid > maxAllowed) {
-      showNotice(`Non puoi offrire ${targetBid}! Limite massimo con riserva crediti: ${maxAllowed} cr.`);
+      showNotice(`Non puoi offrire ${targetBid}! Limite massimo con riserva crediti per gli slot rimanenti: ${maxAllowed} cr.`);
       return;
     }
 
@@ -5391,38 +1104,26 @@ export default function App() {
       }
     };
     triggerStateUpdate(nextState);
-    showNotice(`Ultimo rilancio annullato. Offerta ripristinata a ${prev.amount} cr di ${prev.bidderName}`);
+    showNotice(`Ultimo rilancio annullato. Offerta ripristinata a ${prev.amount} cr.`);
   };
 
   const forceCancelAuction = () => {
     if (!isAdmin) return;
-    const nextState = {
-      ...roomData,
-      currentAuction: null
-    };
-    triggerStateUpdate(nextState);
+    triggerStateUpdate({ ...roomData, currentAuction: null });
     showNotice("Asta annullata dall'amministratore.");
   };
 
   const setAuctionPhase = (phaseId) => {
     if (!isAdmin) return;
-    const nextState = {
-      ...roomData,
-      phase: phaseId
-    };
-    triggerStateUpdate(nextState);
+    triggerStateUpdate({ ...roomData, phase: phaseId });
     showNotice(`Fase d'asta cambiata in: ${PHASES.find(p => p.id === phaseId)?.name}`);
   };
 
   const forcePassTurn = () => {
     if (!isAdmin) return;
     const nextIdx = getNextCallerIndex(roomData.activeCallerIndex, roomData.participants);
-    const nextState = {
-      ...roomData,
-      activeCallerIndex: nextIdx
-    };
-    triggerStateUpdate(nextState);
-    showNotice(`Turno passato manualmente a ${roomData.participants[nextIdx]?.teamName || 'Prossimo manager'}`);
+    triggerStateUpdate({ ...roomData, activeCallerIndex: nextIdx });
+    showNotice(`Turno passato manualmente.`);
   };
 
   const toggleTurnDirection = () => {
@@ -5431,11 +1132,14 @@ export default function App() {
     triggerStateUpdate({ ...roomData, turnDirection: nextDir });
   };
 
+  const handleLeaveRoom = () => {
+    setHasJoined(false);
+  };
+
   const injectMockParticipants = () => {
     const bots = [
       { id: 'bot_1', name: 'Marco (Lakers)', team: 'Showtime Lakers', credits: 200, roster: [], isAdmin: false },
-      { id: 'bot_2', name: 'Luca (Celtics)', team: 'Boston Pride', credits: 200, roster: [], isAdmin: false },
-      { id: 'bot_3', name: 'Davide (Warriors)', team: 'Splash Town', credits: 200, roster: [], isAdmin: false }
+      { id: 'bot_2', name: 'Luca (Celtics)', team: 'Boston Pride', credits: 200, roster: [], isAdmin: false }
     ];
 
     const currentList = [...roomData.participants];
@@ -5444,21 +1148,15 @@ export default function App() {
         currentList.push(b);
       }
     });
-
     triggerStateUpdate({ ...roomData, participants: currentList });
-    showNotice("Aggiunti 3 manager virtuali per testare i turni e i rilanci!");
+    showNotice("Aggiunti 2 manager virtuali per test!");
   };
 
   const simulateBotBid = () => {
-    if (!roomData.currentAuction) {
-      showNotice("Nessuna asta in corso per simulare un rilancio!");
-      return;
-    }
+    if (!roomData.currentAuction) return;
     const bots = roomData.participants.filter(p => p.id.startsWith('bot_') && p.id !== roomData.currentAuction.highBidderId);
-    if (!bots.length) {
-      showNotice("Nessun bot disponibile per rilanciare.");
-      return;
-    }
+    if (!bots.length) return;
+    
     const bot = bots[Math.floor(Math.random() * bots.length)];
     const newBid = roomData.currentAuction.currentBid + Math.floor(Math.random() * 3) + 1;
 
@@ -5491,11 +1189,6 @@ export default function App() {
     }, 4000);
   };
 
-  // Funzione per uscire dalla stanza in sicurezza
-  const handleLeaveRoom = () => {
-    setHasJoined(false);
-  };
-
   const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
   const activeCaller = roomData.participants[roomData.activeCallerIndex] || roomData.participants[0];
   const isMyCallingTurn = currentParticipant && activeCaller && currentParticipant.id === activeCaller.id;
@@ -5514,10 +1207,11 @@ export default function App() {
     });
   }, [roomData.boughtPlayers, currentPhaseConfig, searchTerm]);
 
+
   if (!hasJoined) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
-        <div className="absolute inset-0 bg-radial from-amber-600/10 via-purple-900/10 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-600/10 via-purple-900/10 to-transparent pointer-events-none" />
 
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-md">
           <div className="flex items-center justify-center space-x-3 mb-6">
@@ -5559,7 +1253,7 @@ export default function App() {
                 type="text"
                 value={teamName}
                 onChange={(e) => setTeamName(e.target.value)}
-                placeholder="es. Boston Clowns o Chicago Bulls"
+                placeholder="es. Boston Clowns"
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium focus:outline-none focus:border-amber-500 transition"
               />
             </div>
@@ -5570,7 +1264,7 @@ export default function App() {
                 className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold rounded-xl flex items-center justify-center space-x-2 border border-slate-700 transition shadow-md"
               >
                 <Users className="w-4 h-4 text-emerald-400" />
-                <span>Entra come Manager</span>
+                <span>Entra (Manager)</span>
               </button>
 
               <button
@@ -5578,7 +1272,7 @@ export default function App() {
                 className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 text-slate-950 font-black rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-orange-500/25 transition"
               >
                 <ShieldAlert className="w-4 h-4 text-slate-950" />
-                <span>Host / Admin</span>
+                <span>Crea Host / Admin</span>
               </button>
             </div>
 
@@ -5587,7 +1281,7 @@ export default function App() {
                 <Info className="w-3.5 h-3.5 mr-1" />
                 <span>Regole Squadra Dunkest:</span>
               </div>
-              <p>• 10 giocatori totali (4 Guardie, 4 Ali, 2 Centri: 5 titolari + 5 riserve).</p>
+              <p>• {TOTAL_ROSTER_SIZE} membri totali (4 Guardie, 4 Ali, 2 Centri, 1 Allenatore).</p>
               <p>• Offerte sincronizzate in tempo reale con timer 20s e riserva crediti automatica.</p>
             </div>
           </div>
@@ -5598,7 +1292,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Toast Notification Bar */}
       {notification && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold px-6 py-3 rounded-full shadow-2xl flex items-center space-x-2 animate-bounce">
           <Flame className="w-5 h-5 text-slate-950" />
@@ -5629,16 +1322,16 @@ export default function App() {
               <span>•</span>
               <span className="text-emerald-400 font-bold">{currentParticipant?.credits} Crediti</span>
               <span>•</span>
-              <span>Slot: {currentParticipant?.roster.length || 0}/10</span>
+              <span>Slot: {currentParticipant?.roster.length || 0}/{TOTAL_ROSTER_SIZE}</span>
             </div>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+        <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto custom-scrollbar">
           <button
             onClick={() => setActiveTab('auction')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
               activeTab === 'auction' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -5647,16 +1340,16 @@ export default function App() {
           </button>
           <button
             onClick={() => setActiveTab('rosters')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
               activeTab === 'rosters' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tutte le Rose ({roomData.participants.length})</span>
+            <span className="hidden sm:inline">Rose ({roomData.participants.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('stats')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
               activeTab === 'stats' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -5666,12 +1359,12 @@ export default function App() {
           {isAdmin && (
             <button
               onClick={() => setActiveTab('admin')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
                 activeTab === 'admin' ? 'bg-red-500 text-white shadow' : 'text-red-400 hover:text-white'
               }`}
             >
               <Settings className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Pannello Host</span>
+              <span className="hidden md:inline">Host</span>
             </button>
           )}
         </div>
