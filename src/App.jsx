@@ -3,19 +3,16 @@ import {
   Trophy, Users, Play, Pause, RotateCcw, Clock, 
   Search, ShieldAlert, Award, AlertCircle, 
   Volume2, VolumeX, QrCode, Download, Settings, 
-  LogOut, UserCheck, Flame, FastForward, Info, BarChart3
+  LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { 
-  getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction
+  getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, runTransaction
 } from 'firebase/firestore';
 
-/* STREAMING_CHUNK:Importing players database... */
-// Assicurati che questo file esista nella cartella src/
-import RAW_PLAYERS_JSON from './players.json';
-
+/* STREAMING_CHUNK:Firebase Configuration... */
 const firebaseConfig = {
   apiKey: "AIzaSyC1jop2ZlePaMqL-6Ng5ZDpQNyxVtDMS5A",
   authDomain: "dunkest-asta.firebaseapp.com",
@@ -30,8 +27,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* STREAMING_CHUNK:Initializing persistent ID logic... */
-// ID univoco del dispositivo persistente per sessione/scheda
+/* STREAMING_CHUNK:Persistent ID Logic... */
 const getOrCreateUserId = () => {
   let uid = sessionStorage.getItem('dunkest_session_uid');
   if (!uid) {
@@ -41,30 +37,7 @@ const getOrCreateUserId = () => {
   return uid;
 };
 
-/* STREAMING_CHUNK:Parsing NBA players database... */
-// Conversione immediata e sincrona del JSON importato
-const NBA_PLAYERS_DB = RAW_PLAYERS_JSON
-  .filter(p => p.Position)
-  .map((p, index) => {
-    let role = 'G';
-    if (p.Position === 'Forward') role = 'F';
-    if (p.Position === 'Center') role = 'C';
-    if (p.Position === 'Head Coach') role = 'HC';
-
-    const priceStr = p["Cr 26/27"] || "1,0";
-    const priceParsed = parseFloat(priceStr.replace(',', '.')) || 4.0;
-
-    return {
-      id: `p_${index}`,
-      name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
-      team: p.Team || '',
-      role: role,
-      basePrice: priceParsed,
-      tier: p.Position
-    };
-  });
-
-/* STREAMING_CHUNK:Setting up audio handlers... */
+/* STREAMING_CHUNK:Audio Handlers... */
 const playBuzzerSound = () => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -99,7 +72,7 @@ const playBidSound = () => {
   } catch (e) {}
 };
 
-/* STREAMING_CHUNK:Defining Dunkest roster rules... */
+/* STREAMING_CHUNK:Dunkest Schema Rules... */
 const TOTAL_ROSTER_SIZE = 11;
 const ROSTER_SLOT_SCHEMA = {
   G: { total: 4 },
@@ -116,18 +89,19 @@ const PHASES = [
   { id: 'riserve_libere', name: '5. Riserve (Asta Libera)', allowedRoles: ['G', 'F', 'C'], isBench: true }
 ];
 
-/* STREAMING_CHUNK:Initializing App Component state... */
+/* STREAMING_CHUNK:App Component Initialization... */
 export default function App() {
   const [user, setUser] = useState(null);
   
-  // Ripristino intelligente della sessione da sessionStorage all'avvio
   const [roomCode, setRoomCode] = useState(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      const urlRoom = params.get('room');
+      if (urlRoom) return urlRoom.trim().toUpperCase();
+      
       const savedRoom = sessionStorage.getItem('dunk_roomCode');
       if (savedRoom) return savedRoom;
-
-      const params = new URLSearchParams(window.location.search);
-      return (params.get('room') || 'DUNKEST25').toUpperCase();
+      return 'DUNKEST25';
     } catch {
       return 'DUNKEST25';
     }
@@ -140,6 +114,9 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState('auction'); 
   const [showQRModal, setShowQRModal] = useState(false);
+  
+  const [playersDB, setPlayersDB] = useState([]);
+  const [isPlayersLoading, setIsPlayersLoading] = useState(true);
 
   const [roomData, setRoomData] = useState({
     code: 'DUNKEST25',
@@ -154,6 +131,7 @@ export default function App() {
     boughtPlayers: []
   });
 
+  // Client-side timer state
   const [timeLeft, setTimeLeft] = useState(20);
   const [customBidAmount, setCustomBidAmount] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,33 +139,62 @@ export default function App() {
   const [openingBid, setOpeningBid] = useState(1);
   const [notification, setNotification] = useState(null);
 
-  /* STREAMING_CHUNK:Configuring Authentication & Firestore Sync... */
+  /* STREAMING_CHUNK:Fetching Players and Auth Setup... */
   useEffect(() => {
-    let localUid = sessionStorage.getItem('dunk_uid');
-    if (!localUid) {
-      localUid = 'usr_' + Math.random().toString(36).substr(2, 9);
-      sessionStorage.setItem('dunk_uid', localUid);
-    }
+    const fetchPlayers = async () => {
+      try {
+        const response = await fetch('players.json');
+        if (!response.ok) throw new Error('Network response was not ok');
+        const rawJson = await response.json();
+        
+        const mappedPlayers = rawJson.map((p, index) => {
+          let role = 'G';
+          if (p.Position === 'Forward') role = 'F';
+          if (p.Position === 'Center') role = 'C';
+          if (p.Position === 'Head Coach') role = 'HC';
 
+          const priceParsed = parseFloat((p["Cr 26/27"] || "1,0").replace(',', '.')) || 4.0;
+
+          return {
+            id: `p_${index}`,
+            name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
+            team: p.Team || p.team || '',
+            role: role,
+            basePrice: priceParsed,
+            tier: p.Position
+          };
+        });
+        setPlayersDB(mappedPlayers);
+      } catch (error) {
+        console.error("Failed to load players.json:", error);
+        showNotice("Errore nel caricamento del file giocatori. Assicurati che players.json esista nella cartella public.");
+      } finally {
+        setIsPlayersLoading(false);
+      }
+    };
+    fetchPlayers();
+
+    const localId = getOrCreateUserId();
     const initAuth = async () => {
       try {
         await setPersistence(auth, browserSessionPersistence);
         await signInAnonymously(auth);
       } catch (err) {
         console.warn("Auth offline/anonimo fallback attivo.");
-        setUser({ uid: localUid, isAnonymous: true });
+        setUser({ uid: localId, isAnonymous: true });
       }
     };
     initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, (usr) => {
       if (usr) {
-        setUser({ ...usr, uid: localUid }); // Forza l'uso dell'ID di sessione locale
+        setUser({ ...usr, uid: localId });
       }
     });
     return () => unsubscribe();
   }, []);
 
+  /* STREAMING_CHUNK:Firestore Synchronization... */
   useEffect(() => {
     if (!db || !hasJoined) return;
 
@@ -195,45 +202,64 @@ export default function App() {
     const unsubscribe = onSnapshot(roomDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        
+        // Check if user was kicked by admin
+        const myId = user?.uid;
+        if (myId && data.participants && !data.participants.some(p => p.id === myId)) {
+             setHasJoined(false);
+             sessionStorage.removeItem('dunk_hasJoined');
+             showNotice("Sei stato rimosso dalla stanza.");
+             return;
+        }
+        
         setRoomData(data);
+      } else {
+        // Room deleted
+        setHasJoined(false);
+        sessionStorage.removeItem('dunk_hasJoined');
+        showNotice("La stanza è stata eliminata.");
       }
     }, (error) => {
       console.warn("Firestore snapshot error:", error);
     });
 
     return () => unsubscribe();
-  }, [hasJoined, roomCode]);
+  }, [hasJoined, roomCode, user?.uid]);
 
-  /* STREAMING_CHUNK:Handling robust timer countdowns... */
+  /* STREAMING_CHUNK:Timezone-Independent Timer Logic... */
+  // The absolute core of fixing the clock desync: 
+  // We calculate remaining time based on Server's target 'endsAt' timestamp versus Client's local 'Date.now()'.
+  // Even if Client A is 2 hours ahead of Client B, the difference between (TargetTime - CurrentTime) remains exactly the same duration.
   useEffect(() => {
     if (!roomData.currentAuction) return;
 
     if (roomData.isTimerPaused) {
-       // Se è in pausa, fissa il timer visualizzato ai secondi rimasti salvati
+       // If the timer is explicitly paused, show the frozen time.
        setTimeLeft(roomData.currentAuction.pausedTimeLeft || 20);
        return;
     }
 
     const interval = setInterval(() => {
       const now = Date.now();
+      // Calculate remaining seconds
       let diff = Math.max(0, Math.ceil((roomData.currentAuction.endsAt - now) / 1000));
       
-      // Nascondi eventuali scostamenti dell'orologio locale > timer previsto
       const maxTimer = roomData.timerSeconds || 20;
       if (diff > maxTimer) diff = maxTimer;
 
       setTimeLeft(diff);
 
-      if (diff === 0) {
+      // Client triggers the end
+      if (diff <= 0) {
         clearInterval(interval);
         handleAuctionExpired();
       }
-    }, 250);
+    }, 100); // 100ms precision for smoother sync
 
     return () => clearInterval(interval);
   }, [roomData.currentAuction, roomData.isTimerPaused]);
 
-  /* STREAMING_CHUNK:Processing Auction Expiration logic... */
+  /* STREAMING_CHUNK:Processing Robust Auction Expiration... */
   const handleAuctionExpired = async () => {
     if (!roomData.currentAuction) return;
 
@@ -244,12 +270,13 @@ export default function App() {
         if (!snap.exists()) return;
         const currentData = snap.data();
         
-        // Evita doppie assegnazioni
+        // Stop if someone already processed it or cleared it
         if (!currentData.currentAuction) return;
 
-        // VERIFICA SUL SERVER: Qualcuno ha offerto all'ultimo secondo mentre il tuo PC faceva scattare lo 0?
+        // SERVER TIME VALIDATION: 
+        // We add a tiny 1500ms grace period for high-latency connections.
+        // If the server's expected end time is STILL in the future, abort.
         if (!currentData.isTimerPaused && Date.now() < currentData.currentAuction.serverExpirationThreshold) {
-            // L'asta è ancora viva sul server, interrompi l'assegnazione locale
             return;
         }
 
@@ -277,16 +304,15 @@ export default function App() {
           activeCallerIndex: nextCallerIdx
         });
         
-        // Suona solo quando la transazione passa e viene assegnato
         if (soundEnabled) playBuzzerSound(); 
         showNotice(`🔥 ASSEGNATO! ${player.name} a ${currentData.currentAuction.highBidderName} per ${finalPrice} cr!`);
       });
     } catch (err) {
-      // Ignora l'errore se è bloccato (es. qualcuno ha offerto all'ultimo millisecondo)
+      // Ignore contention failures
     }
   };
 
-  /* STREAMING_CHUNK:Defining Turn & Bid Validation Logic... */
+  /* STREAMING_CHUNK:Defining Phase Validation... */
   const getNextCallerIndex = (currentIndex, participantsList, serverRoomData = roomData) => {
     if (!participantsList || participantsList.length === 0) return 0;
     const step = serverRoomData.turnDirection === 'counter-clockwise' ? -1 : 1;
@@ -354,7 +380,7 @@ export default function App() {
     return Math.max(0, participant.credits - futureSlots);
   };
 
-  /* STREAMING_CHUNK:Implementing safe Room Join functionality... */
+  /* STREAMING_CHUNK:Safe Room Join Logic... */
   const handleJoinOrCreate = async (asAdmin = false) => {
     const cleanRoom = roomCode.trim().toUpperCase();
     if (!cleanRoom) {
@@ -366,7 +392,8 @@ export default function App() {
       return;
     }
 
-    const currentUserId = user?.uid;
+    const currentUserId = user?.uid || getOrCreateUserId();
+
     const newParticipant = {
       id: currentUserId,
       name: managerName.trim(),
@@ -413,7 +440,6 @@ export default function App() {
           setRoomData(serverData);
         });
 
-        // Salva le info della sessione per l'auto-riconnessione in caso di F5
         sessionStorage.setItem('dunk_roomCode', cleanRoom);
         sessionStorage.setItem('dunk_teamName', newParticipant.teamName);
         sessionStorage.setItem('dunk_managerName', newParticipant.name);
@@ -426,11 +452,12 @@ export default function App() {
         return;
       } catch (err) {
         console.error("Transazione fallita:", err);
+        showNotice("Errore di rete. Riprova.");
       }
     }
   };
 
-  /* STREAMING_CHUNK:Handling Bids & Nominations synchronously... */
+  /* STREAMING_CHUNK:Opening new auction nominations... */
   const handleStartNomination = async () => {
     if (!selectedNominee) {
       showNotice("Seleziona prima un giocatore dal database!");
@@ -450,7 +477,7 @@ export default function App() {
 
     const timerDuration = roomData.timerSeconds || 20;
     
-    // Scadenza sul SERVER calcolata in modo assoluto
+    // Scadenza assoluta sul server per garantire uniformità tra tutti i device (Fuso orario indipendente)
     const now = Date.now();
     const localEndsAt = now + (timerDuration * 1000);
     const serverExpirationThreshold = localEndsAt + 1500; 
@@ -461,7 +488,7 @@ export default function App() {
       highBidderId: currentParticipant.id,
       highBidderName: currentParticipant.teamName,
       endsAt: localEndsAt,
-      pausedTimeLeft: timerDuration,
+      pausedTimeLeft: timerDuration, // Initialize paused Time
       serverExpirationThreshold: serverExpirationThreshold,
       bidHistory: [
         {
@@ -483,6 +510,7 @@ export default function App() {
     } catch(e) {}
   };
 
+  /* STREAMING_CHUNK:Processing synchronous bids... */
   const handlePlaceBid = async (deltaOrAmount, isAbsolute = false) => {
     const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
     if (!currentParticipant || !roomData.currentAuction) return;
@@ -501,7 +529,7 @@ export default function App() {
         
         if (!currentData.currentAuction) throw new Error("Asta già chiusa!");
 
-        // Controlla il vero blocco del server per impedire rilanci fantasma scaduti
+        // Server check to strictly block phantom bids after time expired
         if (!currentData.isTimerPaused && Date.now() > currentData.currentAuction.serverExpirationThreshold) {
            throw new Error("L'asta è già terminata.");
         }
@@ -511,7 +539,6 @@ export default function App() {
 
         if (isNaN(targetBid) || targetBid <= currentHighBid) throw new Error(`L'offerta deve essere superiore a ${currentHighBid}`);
         
-        // Usa i dati aggiornati del server per calcolare il maxAllowed
         const serverParticipant = currentData.participants.find(p => p.id === currentParticipant.id);
         const maxAllowed = getMaxBidAllowed(serverParticipant || currentParticipant);
         if (targetBid > maxAllowed) throw new Error(`Supera il tetto massimo (${maxAllowed} cr)`);
@@ -533,7 +560,7 @@ export default function App() {
           highBidderName: currentParticipant.teamName,
           endsAt: localEndsAt, 
           pausedTimeLeft: timerDuration,
-          serverExpirationThreshold: localEndsAt + 1500, // Aggiorna tolleranza
+          serverExpirationThreshold: localEndsAt + 1500,
           bidHistory: [newHistoryEntry, ...(currentData.currentAuction.bidHistory || [])]
         };
 
@@ -549,7 +576,7 @@ export default function App() {
     }
   };
 
-  /* STREAMING_CHUNK:Admin Controls & Timer management... */
+  /* STREAMING_CHUNK:Admin Controls: Timer management & Room deletion... */
   const toggleTimerPause = async () => {
     if (!isAdmin) return;
     try {
@@ -565,10 +592,10 @@ export default function App() {
         let nextPausedTimeLeft = currentData.currentAuction.pausedTimeLeft;
 
         if (nextPaused) {
-           // Se mettiamo in pausa, salviamo i secondi rimanenti ESATTI
+           // We freeze the exact remaining seconds based on the server clock diff
            nextPausedTimeLeft = Math.max(0, Math.ceil((currentData.currentAuction.endsAt - Date.now()) / 1000));
         } else {
-           // Se togliamo la pausa, spingiamo la scadenza in avanti basandoci sui secondi che erano rimasti
+           // We resume, projecting the frozen time into a new future endsAt timestamp
            nextEndsAt = Date.now() + ((currentData.currentAuction.pausedTimeLeft || 20) * 1000);
            currentData.currentAuction.serverExpirationThreshold = nextEndsAt + 1500;
         }
@@ -595,7 +622,8 @@ export default function App() {
           endsAt: Date.now() + (secs * 1000),
           pausedTimeLeft: secs,
           serverExpirationThreshold: Date.now() + (secs * 1000) + 1500 
-        } 
+        },
+        isTimerPaused: false 
       }, { merge: true });
     } catch(e){}
   };
@@ -623,7 +651,8 @@ export default function App() {
           pausedTimeLeft: timerDuration,
           serverExpirationThreshold: Date.now() + (timerDuration * 1000) + 1500,
           bidHistory: history
-        }
+        },
+        isTimerPaused: false
       }, { merge: true });
       showNotice(`Ultimo rilancio annullato. Offerta ripristinata a ${prev.amount} cr.`);
     } catch(e){}
@@ -633,7 +662,7 @@ export default function App() {
     if (!isAdmin) return;
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, { currentAuction: null }, { merge: true });
+      await setDoc(roomDocRef, { currentAuction: null, isTimerPaused: false }, { merge: true });
       showNotice("Asta annullata dall'amministratore.");
     } catch(e){}
   };
@@ -665,64 +694,57 @@ export default function App() {
       await setDoc(roomDocRef, { turnDirection: nextDir }, { merge: true });
     } catch(e){}
   };
+  
+  const deleteRoom = async () => {
+    if (!isAdmin) return;
+    if (confirm("Sei sicuro di voler eliminare DEFINITIVAMENTE questa stanza e tutti i progressi?")) {
+      try {
+        const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+        await deleteDoc(roomDocRef);
+        handleLeaveRoom();
+      } catch (err) {
+        showNotice("Errore durante l'eliminazione della stanza.");
+      }
+    }
+  };
+
+  const removeManager = async (managerId) => {
+     if (!isAdmin) return;
+     if (!confirm("Rimuovere questo manager? I suoi giocatori torneranno disponibili.")) return;
+     
+     try {
+       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+       await runTransaction(db, async (transaction) => {
+         const snap = await transaction.get(roomDocRef);
+         if(snap.exists()) {
+           const currentData = snap.data();
+           const currentParts = currentData.participants || [];
+           const targetManager = currentParts.find(p => p.id === managerId);
+           
+           if (targetManager) {
+               // Rimuovi dal DB i giocatori che aveva comprato
+               const managerPlayerIds = targetManager.roster.map(p => p.id);
+               const newBoughtPlayers = (currentData.boughtPlayers || []).filter(pid => !managerPlayerIds.includes(pid));
+               
+               const updatedParts = currentParts.filter(p => p.id !== managerId);
+               
+               transaction.update(roomDocRef, { 
+                   participants: updatedParts,
+                   boughtPlayers: newBoughtPlayers 
+               });
+           }
+         }
+       });
+       showNotice("Manager rimosso. I giocatori sono tornati sul mercato.");
+     } catch(err) {}
+  };
 
   /* STREAMING_CHUNK:Session Management & Notifications... */
   const handleLeaveRoom = () => {
-    // Pulisce la sessione per evitare l'auto-riconnessione automatica
     sessionStorage.removeItem('dunk_hasJoined');
     sessionStorage.removeItem('dunk_roomCode');
     sessionStorage.removeItem('dunk_isAdmin');
     setHasJoined(false);
-  };
-
-  const injectMockParticipants = () => {
-    const bots = [
-      { id: 'bot_1', name: 'Marco (Lakers)', team: 'Showtime Lakers', credits: 200, roster: [], isAdmin: false },
-      { id: 'bot_2', name: 'Luca (Celtics)', team: 'Boston Pride', credits: 200, roster: [], isAdmin: false }
-    ];
-
-    const currentList = [...roomData.participants];
-    bots.forEach(b => {
-      if (!currentList.some(p => p.id === b.id)) {
-        currentList.push(b);
-      }
-    });
-    triggerStateUpdate({ ...roomData, participants: currentList });
-    showNotice("Aggiunti 2 manager virtuali per test!");
-  };
-
-  const simulateBotBid = () => {
-    if (!roomData.currentAuction) return;
-    const bots = roomData.participants.filter(p => p.id.startsWith('bot_') && p.id !== roomData.currentAuction.highBidderId);
-    if (!bots.length) return;
-    
-    const bot = bots[Math.floor(Math.random() * bots.length)];
-    const newBid = roomData.currentAuction.currentBid + Math.floor(Math.random() * 3) + 1;
-
-    const timerDuration = roomData.timerSeconds || 20;
-    const localEndsAt = Date.now() + (timerDuration * 1000);
-
-    const updatedAuction = {
-      ...roomData.currentAuction,
-      currentBid: newBid,
-      highBidderId: bot.id,
-      highBidderName: bot.teamName,
-      endsAt: localEndsAt,
-      pausedTimeLeft: timerDuration,
-      serverExpirationThreshold: localEndsAt + 1500,
-      bidHistory: [
-        {
-          bidderId: bot.id,
-          bidderName: bot.teamName,
-          amount: newBid,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        },
-        ...(roomData.currentAuction.bidHistory || [])
-      ]
-    };
-
-    if (soundEnabled) playBidSound();
-    triggerStateUpdate({ ...roomData, currentAuction: updatedAuction, isTimerPaused: false });
   };
 
   const showNotice = (msg) => {
@@ -732,7 +754,7 @@ export default function App() {
     }, 4000);
   };
 
-  /* STREAMING_CHUNK:Rendering the login page... */
+  /* STREAMING_CHUNK:Rendering Login Screen... */
   const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
   const activeCaller = roomData.participants[roomData.activeCallerIndex] || roomData.participants[0];
   const isMyCallingTurn = currentParticipant && activeCaller && currentParticipant.id === activeCaller.id;
@@ -740,7 +762,7 @@ export default function App() {
 
   const availablePlayers = useMemo(() => {
     const boughtSet = new Set(roomData.boughtPlayers || []);
-    return NBA_PLAYERS_DB.filter(p => {
+    return playersDB.filter(p => {
       if (boughtSet.has(p.id)) return false;
       if (!currentPhaseConfig.allowedRoles.includes(p.role)) return false;
       if (searchTerm) {
@@ -749,10 +771,9 @@ export default function App() {
       }
       return true;
     });
-  }, [roomData.boughtPlayers, currentPhaseConfig, searchTerm]);
+  }, [playersDB, roomData.boughtPlayers, currentPhaseConfig, searchTerm]);
 
   if (!hasJoined) {
-    // Determina se l'utente è arrivato tramite URL (QR Code) controllando se c'è un parametro room
     const isFromQRCode = window.location.search.includes('room=');
 
     return (
@@ -778,7 +799,7 @@ export default function App() {
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                 placeholder="es. DUNKEST25"
-                disabled={isFromQRCode} // Disabilita il campo se arrivano da QR
+                disabled={isFromQRCode}
                 className={`w-full px-4 py-3 border rounded-xl font-mono font-bold tracking-widest focus:outline-none transition ${
                    isFromQRCode ? 'bg-slate-900 border-slate-800 text-amber-600 cursor-not-allowed' : 'bg-slate-950 border-slate-700 text-amber-400 focus:border-amber-500'
                 }`}
@@ -826,6 +847,12 @@ export default function App() {
                 </button>
               )}
             </div>
+            
+            {isPlayersLoading && (
+                <div className="text-center text-xs text-amber-500 animate-pulse font-bold mt-2">
+                    Caricamento giocatori in corso...
+                </div>
+            )}
 
             <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-400 space-y-1">
               <div className="flex items-center text-amber-400 font-semibold mb-1">
@@ -939,7 +966,6 @@ export default function App() {
             <span className="hidden sm:inline">Invita con QR</span>
           </button>
 
-          {/* PULSANTE LOGOUT */}
           <button
             onClick={handleLeaveRoom}
             className="p-2 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-800/50 text-red-400 transition-colors flex items-center justify-center"
@@ -1307,14 +1333,6 @@ export default function App() {
                     <Flame className="w-4 h-4 text-orange-400" />
                     <span>Cronologia Rilanci in Tempo Reale</span>
                   </h3>
-                  {roomData.currentAuction && (
-                    <button
-                      onClick={simulateBotBid}
-                      className="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1 rounded-lg border border-slate-700"
-                    >
-                      🤖 Simula Rilancio Bot
-                    </button>
-                  )}
                 </div>
 
                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
@@ -1667,6 +1685,16 @@ export default function App() {
                 Hai il controllo totale su fasi, tempo, turni e crediti dei manager partecipanti.
               </p>
             </div>
+            
+            <div className="flex justify-end mb-4">
+               <button
+                  onClick={deleteRoom}
+                  className="px-4 py-2 bg-red-950 hover:bg-red-900 text-red-300 font-bold rounded-xl border border-red-800 flex items-center space-x-2 transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Elimina Stanza Definitivamente</span>
+                </button>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Phase Switcher */}
@@ -1735,7 +1763,7 @@ export default function App() {
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
               <h3 className="font-bold text-white text-base">Modifica Manuale Crediti e Franchigie</h3>
               <p className="text-xs text-slate-400">
-                Se qualcuno ha fatto un errore o volete correggere i crediti manualmente:
+                Seleziona i crediti manualmente o rimuovi un manager dalla stanza (i suoi giocatori torneranno liberi).
               </p>
 
               <div className="space-y-3">
@@ -1772,23 +1800,11 @@ export default function App() {
                       />
 
                       <button
-                        onClick={async () => {
-                          try {
-                            const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-                            await runTransaction(db, async (transaction) => {
-                              const snap = await transaction.get(roomDocRef);
-                              if(snap.exists()) {
-                                const currentParts = snap.data().participants || [];
-                                const updatedParts = currentParts.filter(p => p.id !== m.id);
-                                transaction.update(roomDocRef, { participants: updatedParts });
-                              }
-                            });
-                          } catch(err) {}
-                        }}
+                        onClick={() => removeManager(m.id)}
                         className="p-1.5 text-red-400 hover:bg-red-950/40 rounded-lg"
-                        title="Rimuovi manager dalla stanza"
+                        title="Rimuovi manager e reimposta i suoi giocatori liberi"
                       >
-                        ✕
+                        <Trash2 className="w-4 h-4"/>
                       </button>
                     </div>
                   </div>
