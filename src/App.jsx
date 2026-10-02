@@ -12,23 +12,25 @@ import {
   getFirestore, doc, setDoc, onSnapshot
 } from 'firebase/firestore';
 
-let db = null;
-let auth = null;
-let appId = 'dunkest-auction-pro';
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
 
-try {
-  if (typeof __firebase_config !== 'undefined') {
-    const firebaseConfig = JSON.parse(__firebase_config);
-    const app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    if (typeof __app_id !== 'undefined') {
-      appId = __app_id;
-    }
-  }
-} catch (e) {
-  console.warn("Firebase initialization skipped or using local fallback mode:", e);
-}
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC1jop2ZlePaMqL-6Ng5ZDpQNyxVtDMS5A",
+  authDomain: "dunkest-asta.firebaseapp.com",
+  projectId: "dunkest-asta",
+  storageBucket: "dunkest-asta.firebasestorage.app",
+  messagingSenderId: "432619397838",
+  appId: "1:432619397838:web:5d4d0ed6769768fdc3669f",
+  measurementId: "G-SQE5SHTJ3B"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = 'dunkest-auction-pro';
+const analytics = getAnalytics(app);
 
 // ---------------------------------------------------------
 // 1. INCOLLA QUI L'INTERO ARRAY JSON DI DUNKEST
