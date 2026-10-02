@@ -12,6 +12,7 @@ import {
   getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction
 } from 'firebase/firestore';
 
+/* STREAMING_CHUNK:Importing players database... */
 // Assicurati che questo file esista nella cartella src/
 import RAW_PLAYERS_JSON from './players.json';
 
@@ -29,6 +30,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+/* STREAMING_CHUNK:Initializing persistent ID logic... */
 // ID univoco del dispositivo persistente per sessione/scheda
 const getOrCreateUserId = () => {
   let uid = sessionStorage.getItem('dunkest_session_uid');
@@ -39,6 +41,7 @@ const getOrCreateUserId = () => {
   return uid;
 };
 
+/* STREAMING_CHUNK:Parsing NBA players database... */
 // Conversione immediata e sincrona del JSON importato
 const NBA_PLAYERS_DB = RAW_PLAYERS_JSON
   .filter(p => p.Position)
@@ -61,6 +64,7 @@ const NBA_PLAYERS_DB = RAW_PLAYERS_JSON
     };
   });
 
+/* STREAMING_CHUNK:Setting up audio handlers... */
 const playBuzzerSound = () => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -95,6 +99,7 @@ const playBidSound = () => {
   } catch (e) {}
 };
 
+/* STREAMING_CHUNK:Defining Dunkest roster rules... */
 const TOTAL_ROSTER_SIZE = 11;
 const ROSTER_SLOT_SCHEMA = {
   G: { total: 4 },
@@ -111,6 +116,7 @@ const PHASES = [
   { id: 'riserve_libere', name: '5. Riserve (Asta Libera)', allowedRoles: ['G', 'F', 'C'], isBench: true }
 ];
 
+/* STREAMING_CHUNK:Initializing App Component state... */
 export default function App() {
   const [user, setUser] = useState(null);
   
@@ -155,6 +161,7 @@ export default function App() {
   const [openingBid, setOpeningBid] = useState(1);
   const [notification, setNotification] = useState(null);
 
+  /* STREAMING_CHUNK:Configuring Authentication & Firestore Sync... */
   useEffect(() => {
     let localUid = sessionStorage.getItem('dunk_uid');
     if (!localUid) {
@@ -197,14 +204,24 @@ export default function App() {
     return () => unsubscribe();
   }, [hasJoined, roomCode]);
 
+  /* STREAMING_CHUNK:Handling robust timer countdowns... */
   useEffect(() => {
-    if (!roomData.currentAuction || roomData.isTimerPaused) {
-      return;
+    if (!roomData.currentAuction) return;
+
+    if (roomData.isTimerPaused) {
+       // Se è in pausa, fissa il timer visualizzato ai secondi rimasti salvati
+       setTimeLeft(roomData.currentAuction.pausedTimeLeft || 20);
+       return;
     }
 
     const interval = setInterval(() => {
       const now = Date.now();
-      const diff = Math.max(0, Math.ceil((roomData.currentAuction.endsAt - now) / 1000));
+      let diff = Math.max(0, Math.ceil((roomData.currentAuction.endsAt - now) / 1000));
+      
+      // Nascondi eventuali scostamenti dell'orologio locale > timer previsto
+      const maxTimer = roomData.timerSeconds || 20;
+      if (diff > maxTimer) diff = maxTimer;
+
       setTimeLeft(diff);
 
       if (diff === 0) {
@@ -216,6 +233,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [roomData.currentAuction, roomData.isTimerPaused]);
 
+  /* STREAMING_CHUNK:Processing Auction Expiration logic... */
   const handleAuctionExpired = async () => {
     if (!roomData.currentAuction) return;
 
@@ -226,12 +244,11 @@ export default function App() {
         if (!snap.exists()) return;
         const currentData = snap.data();
         
-        // Prevent double assignments
+        // Evita doppie assegnazioni
         if (!currentData.currentAuction) return;
 
-        // VERIFICA SUL SERVER: Il timer del server è davvero scaduto? 
-        // Qualcuno potrebbe aver rilanciato in quest'ultimo istante.
-        if (Date.now() < currentData.currentAuction.serverExpirationThreshold) {
+        // VERIFICA SUL SERVER: Qualcuno ha offerto all'ultimo secondo mentre il tuo PC faceva scattare lo 0?
+        if (!currentData.isTimerPaused && Date.now() < currentData.currentAuction.serverExpirationThreshold) {
             // L'asta è ancora viva sul server, interrompi l'assegnazione locale
             return;
         }
@@ -269,6 +286,7 @@ export default function App() {
     }
   };
 
+  /* STREAMING_CHUNK:Defining Turn & Bid Validation Logic... */
   const getNextCallerIndex = (currentIndex, participantsList, serverRoomData = roomData) => {
     if (!participantsList || participantsList.length === 0) return 0;
     const step = serverRoomData.turnDirection === 'counter-clockwise' ? -1 : 1;
@@ -336,6 +354,7 @@ export default function App() {
     return Math.max(0, participant.credits - futureSlots);
   };
 
+  /* STREAMING_CHUNK:Implementing safe Room Join functionality... */
   const handleJoinOrCreate = async (asAdmin = false) => {
     const cleanRoom = roomCode.trim().toUpperCase();
     if (!cleanRoom) {
@@ -411,6 +430,7 @@ export default function App() {
     }
   };
 
+  /* STREAMING_CHUNK:Handling Bids & Nominations synchronously... */
   const handleStartNomination = async () => {
     if (!selectedNominee) {
       showNotice("Seleziona prima un giocatore dal database!");
@@ -430,8 +450,9 @@ export default function App() {
 
     const timerDuration = roomData.timerSeconds || 20;
     
-    // Sicurezza: L'asta scade sul SERVER leggermente dopo (es. + 1.5 sec) per dare tempo alle transazioni in volo
-    const localEndsAt = Date.now() + (timerDuration * 1000);
+    // Scadenza sul SERVER calcolata in modo assoluto
+    const now = Date.now();
+    const localEndsAt = now + (timerDuration * 1000);
     const serverExpirationThreshold = localEndsAt + 1500; 
 
     const newAuction = {
@@ -440,6 +461,7 @@ export default function App() {
       highBidderId: currentParticipant.id,
       highBidderName: currentParticipant.teamName,
       endsAt: localEndsAt,
+      pausedTimeLeft: timerDuration,
       serverExpirationThreshold: serverExpirationThreshold,
       bidHistory: [
         {
@@ -479,8 +501,8 @@ export default function App() {
         
         if (!currentData.currentAuction) throw new Error("Asta già chiusa!");
 
-        // Controlla se l'asta è davvero chiusa anche considerando il delay di volo
-        if (Date.now() > currentData.currentAuction.serverExpirationThreshold) {
+        // Controlla il vero blocco del server per impedire rilanci fantasma scaduti
+        if (!currentData.isTimerPaused && Date.now() > currentData.currentAuction.serverExpirationThreshold) {
            throw new Error("L'asta è già terminata.");
         }
 
@@ -510,6 +532,7 @@ export default function App() {
           highBidderId: currentParticipant.id,
           highBidderName: currentParticipant.teamName,
           endsAt: localEndsAt, 
+          pausedTimeLeft: timerDuration,
           serverExpirationThreshold: localEndsAt + 1500, // Aggiorna tolleranza
           bidHistory: [newHistoryEntry, ...(currentData.currentAuction.bidHistory || [])]
         };
@@ -526,6 +549,7 @@ export default function App() {
     }
   };
 
+  /* STREAMING_CHUNK:Admin Controls & Timer management... */
   const toggleTimerPause = async () => {
     if (!isAdmin) return;
     try {
@@ -534,16 +558,28 @@ export default function App() {
         const snap = await transaction.get(roomDocRef);
         if(!snap.exists()) return;
         const currentData = snap.data();
-        const nextPaused = !currentData.isTimerPaused;
-        let nextEndsAt = currentData.currentAuction?.endsAt;
+        if(!currentData.currentAuction) return;
 
-        if (!nextPaused) {
-          nextEndsAt = Date.now() + (timeLeft * 1000);
+        const nextPaused = !currentData.isTimerPaused;
+        let nextEndsAt = currentData.currentAuction.endsAt;
+        let nextPausedTimeLeft = currentData.currentAuction.pausedTimeLeft;
+
+        if (nextPaused) {
+           // Se mettiamo in pausa, salviamo i secondi rimanenti ESATTI
+           nextPausedTimeLeft = Math.max(0, Math.ceil((currentData.currentAuction.endsAt - Date.now()) / 1000));
+        } else {
+           // Se togliamo la pausa, spingiamo la scadenza in avanti basandoci sui secondi che erano rimasti
+           nextEndsAt = Date.now() + ((currentData.currentAuction.pausedTimeLeft || 20) * 1000);
+           currentData.currentAuction.serverExpirationThreshold = nextEndsAt + 1500;
         }
 
         transaction.update(roomDocRef, {
           isTimerPaused: nextPaused,
-          currentAuction: currentData.currentAuction ? { ...currentData.currentAuction, endsAt: nextEndsAt } : null
+          currentAuction: { 
+            ...currentData.currentAuction, 
+            endsAt: nextEndsAt,
+            pausedTimeLeft: nextPausedTimeLeft
+          }
         });
       });
     } catch(e) {}
@@ -553,7 +589,14 @@ export default function App() {
     if (!isAdmin || !roomData.currentAuction) return;
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, { currentAuction: { ...roomData.currentAuction, endsAt: Date.now() + (secs * 1000) } }, { merge: true });
+      await setDoc(roomDocRef, { 
+        currentAuction: { 
+          ...roomData.currentAuction, 
+          endsAt: Date.now() + (secs * 1000),
+          pausedTimeLeft: secs,
+          serverExpirationThreshold: Date.now() + (secs * 1000) + 1500 
+        } 
+      }, { merge: true });
     } catch(e){}
   };
 
@@ -566,6 +609,7 @@ export default function App() {
     }
     history.shift(); 
     const prev = history[0];
+    const timerDuration = roomData.timerSeconds || 20;
 
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
@@ -575,7 +619,9 @@ export default function App() {
           currentBid: prev.amount,
           highBidderId: prev.bidderId,
           highBidderName: prev.bidderName,
-          endsAt: Date.now() + (roomData.timerSeconds * 1000),
+          endsAt: Date.now() + (timerDuration * 1000),
+          pausedTimeLeft: timerDuration,
+          serverExpirationThreshold: Date.now() + (timerDuration * 1000) + 1500,
           bidHistory: history
         }
       }, { merge: true });
@@ -620,6 +666,7 @@ export default function App() {
     } catch(e){}
   };
 
+  /* STREAMING_CHUNK:Session Management & Notifications... */
   const handleLeaveRoom = () => {
     // Pulisce la sessione per evitare l'auto-riconnessione automatica
     sessionStorage.removeItem('dunk_hasJoined');
@@ -653,12 +700,16 @@ export default function App() {
     const newBid = roomData.currentAuction.currentBid + Math.floor(Math.random() * 3) + 1;
 
     const timerDuration = roomData.timerSeconds || 20;
+    const localEndsAt = Date.now() + (timerDuration * 1000);
+
     const updatedAuction = {
       ...roomData.currentAuction,
       currentBid: newBid,
       highBidderId: bot.id,
       highBidderName: bot.teamName,
-      endsAt: Date.now() + (timerDuration * 1000),
+      endsAt: localEndsAt,
+      pausedTimeLeft: timerDuration,
+      serverExpirationThreshold: localEndsAt + 1500,
       bidHistory: [
         {
           bidderId: bot.id,
@@ -681,6 +732,7 @@ export default function App() {
     }, 4000);
   };
 
+  /* STREAMING_CHUNK:Rendering the login page... */
   const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
   const activeCaller = roomData.participants[roomData.activeCallerIndex] || roomData.participants[0];
   const isMyCallingTurn = currentParticipant && activeCaller && currentParticipant.id === activeCaller.id;
@@ -789,6 +841,7 @@ export default function App() {
     );
   }
 
+  /* STREAMING_CHUNK:Rendering the main app workspace... */
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {notification && (
@@ -1254,6 +1307,14 @@ export default function App() {
                     <Flame className="w-4 h-4 text-orange-400" />
                     <span>Cronologia Rilanci in Tempo Reale</span>
                   </h3>
+                  {roomData.currentAuction && (
+                    <button
+                      onClick={simulateBotBid}
+                      className="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1 rounded-lg border border-slate-700"
+                    >
+                      🤖 Simula Rilancio Bot
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
