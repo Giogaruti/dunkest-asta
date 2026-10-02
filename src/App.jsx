@@ -9,7 +9,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { 
-  getFirestore, doc, setDoc, onSnapshot
+  getFirestore, doc, setDoc, getDoc, onSnapshot
 } from 'firebase/firestore';
 import { getAnalytics } from "firebase/analytics";
 
@@ -5147,13 +5147,28 @@ export default function App() {
     return Math.max(0, participant.credits - futureSlots);
   };
 
-  const handleJoinOrCreate = (asAdmin = false) => {
+  const handleJoinOrCreate = async (asAdmin = false) => {
+    const cleanRoom = roomCode.trim().toUpperCase();
+    if (!cleanRoom) {
+      showNotice("Inserisci un codice stanza!");
+      return;
+    }
     if (!teamName.trim() || !managerName.trim()) {
       showNotice("Inserisci sia il tuo nome che il nome della tua franchigia Dunkest!");
       return;
     }
 
-    const currentUserId = user?.uid || `usr_${Date.now()}`;
+    // Assicuriamoci di avere un ID utente univoco e stabile per questo dispositivo/browser
+    let currentUserId = user?.uid;
+    if (!currentUserId) {
+      currentUserId = localStorage.getItem('dunkest_user_id');
+      if (!currentUserId) {
+        currentUserId = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+        localStorage.setItem('dunkest_user_id', currentUserId);
+      }
+      setUser({ uid: currentUserId, isAnonymous: true });
+    }
+
     const newParticipant = {
       id: currentUserId,
       name: managerName.trim(),
@@ -5163,9 +5178,49 @@ export default function App() {
       isAdmin: asAdmin
     };
 
+    // Se Firebase è attivo, leggiamo i dati reali dal database per NON sovrascrivere gli altri
+    if (db) {
+      try {
+        const roomDocRef = doc(db, 'rooms', cleanRoom);
+        const snap = await getDoc(roomDocRef);
+
+        let currentRoomData = { ...roomData };
+        if (snap.exists()) {
+          currentRoomData = snap.data();
+        }
+
+        const existingParticipants = currentRoomData.participants || [];
+        const existingIndex = existingParticipants.findIndex(p => p.id === currentUserId);
+        let updatedList = [...existingParticipants];
+
+        if (existingIndex >= 0) {
+          // Se lo stesso utente rientra o cambia nome
+          updatedList[existingIndex] = { ...updatedList[existingIndex], ...newParticipant };
+        } else {
+          // Nuovo utente: lo aggiungiamo in coda alla lista SENZA cancellare gli altri
+          updatedList.push(newParticipant);
+        }
+
+        const updatedState = {
+          ...currentRoomData,
+          code: cleanRoom,
+          participants: updatedList
+        };
+
+        await setDoc(roomDocRef, updatedState, { merge: true });
+        setRoomData(updatedState);
+        setIsAdmin(asAdmin);
+        setHasJoined(true);
+        showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}!`);
+        return;
+      } catch (err) {
+        console.error("Errore salvataggio ingresso stanza su Firebase:", err);
+      }
+    }
+
+    // Fallback locale in caso di assenza temporanea di rete
     const existingIndex = roomData.participants.findIndex(p => p.id === currentUserId);
     let updatedParticipants = [...roomData.participants];
-
     if (existingIndex >= 0) {
       updatedParticipants[existingIndex] = { ...updatedParticipants[existingIndex], ...newParticipant };
     } else {
@@ -5174,7 +5229,7 @@ export default function App() {
 
     const updatedState = {
       ...roomData,
-      code: roomCode.toUpperCase(),
+      code: cleanRoom,
       participants: updatedParticipants
     };
 
