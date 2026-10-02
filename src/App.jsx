@@ -9,11 +9,8 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { 
-  getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction
+  getFirestore, doc, setDoc, onSnapshot, runTransaction
 } from 'firebase/firestore';
-
-// Assicurati che questo file esista nella cartella src/
-import RAW_PLAYERS_JSON from './players.json';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC1jop2ZlePaMqL-6Ng5ZDpQNyxVtDMS5A",
@@ -29,27 +26,16 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Conversione del JSON per il motore dell'Asta
-const NBA_PLAYERS_DB = RAW_PLAYERS_JSON
-  .filter(p => p.Position)
-  .map((p, index) => {
-    let role = 'G';
-    if (p.Position === 'Forward') role = 'F';
-    if (p.Position === 'Center') role = 'C';
-    if (p.Position === 'Head Coach') role = 'HC';
-
-    const priceStr = p["Cr 26/27"] || "1,0";
-    const priceParsed = parseFloat(priceStr.replace(',', '.')) || 4.0;
-
-    return {
-      id: `p_${index}`,
-      name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
-      team: p.Team || '',
-      role: role,
-      basePrice: priceParsed,
-      tier: p.Position
-    };
-  });
+// Generate or retrieve a persistent ID for the current browser session.
+// This survives page reloads and prevents the user from being kicked out or duplicating.
+const getOrCreateUserId = () => {
+  let uid = sessionStorage.getItem('dunkest_session_uid');
+  if (!uid) {
+    uid = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+    sessionStorage.setItem('dunkest_session_uid', uid);
+  }
+  return uid;
+};
 
 const playBuzzerSound = () => {
   try {
@@ -65,7 +51,9 @@ const playBuzzerSound = () => {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.4);
-  } catch (e) {}
+  } catch (e) {
+    // Audio might be blocked before first user gesture
+  }
 };
 
 const playBidSound = () => {
@@ -85,12 +73,13 @@ const playBidSound = () => {
   } catch (e) {}
 };
 
+// --- SCHEMA DUNKEST CHE INCLUDE L'ALLENATORE (11 Giocatori Totali) ---
 const TOTAL_ROSTER_SIZE = 11;
 const ROSTER_SLOT_SCHEMA = {
   G: { total: 4 },
   F: { total: 4 },
   C: { total: 2 },
-  HC: { total: 1 } 
+  HC: { total: 1 } // Head Coach
 };
 
 const PHASES = [
@@ -106,7 +95,9 @@ export default function App() {
   const [roomCode, setRoomCode] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      return (params.get('room') || 'DUNKEST25').toUpperCase();
+      const urlRoom = params.get('room');
+      if (urlRoom) return urlRoom.trim().toUpperCase();
+      return 'DUNKEST25';
     } catch {
       return 'DUNKEST25';
     }
@@ -117,8 +108,12 @@ export default function App() {
   const [hasJoined, setHasJoined] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [activeTab, setActiveTab] = useState('auction'); 
+
+  const [activeTab, setActiveTab] = useState('auction');
   const [showQRModal, setShowQRModal] = useState(false);
+  
+  const [playersDB, setPlayersDB] = useState([]);
+  const [isPlayersLoading, setIsPlayersLoading] = useState(true);
 
   const [roomData, setRoomData] = useState({
     code: 'DUNKEST25',
@@ -141,37 +136,77 @@ export default function App() {
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
-    let localUid = sessionStorage.getItem('dunk_uid');
-    if (!localUid) {
-      localUid = 'usr_' + Math.random().toString(36).substr(2, 9);
-      sessionStorage.setItem('dunk_uid', localUid);
-    }
-
-    const initAuth = async () => {
+    // 1. Fetch players from external local JSON file
+    const fetchPlayers = async () => {
       try {
-        await signInAnonymously(auth);
-      } catch (err) {
-        console.warn("Auth offline/anonimo fallback attivo.");
-        setUser({ uid: localUid, isAnonymous: true });
+        // Assuming the file is placed in the public/ folder as players.json
+        const response = await fetch('/players.json');
+        if (!response.ok) throw new Error('Network response was not ok');
+        const rawJson = await response.json();
+        
+        const mappedPlayers = rawJson.map((p, index) => {
+          let role = 'G';
+          if (p.Position === 'Forward') role = 'F';
+          if (p.Position === 'Center') role = 'C';
+          if (p.Position === 'Head Coach') role = 'HC';
+
+          const priceParsed = parseFloat((p["Cr 26/27"] || "1,0").replace(',', '.')) || 4.0;
+
+          return {
+            id: `p_${index}`,
+            name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
+            team: p.Team,
+            role: role,
+            basePrice: priceParsed,
+            tier: 'Standard'
+          };
+        });
+        setPlayersDB(mappedPlayers);
+      } catch (error) {
+        console.error("Failed to load players.json:", error);
+        showNotice("Errore nel caricamento del file giocatori. Assicurati che players.json esista.");
+      } finally {
+        setIsPlayersLoading(false);
       }
     };
-    initAuth();
+
+    fetchPlayers();
+
+    // 2. Initialize stable User ID immediately
+    const localId = getOrCreateUserId();
+    setUser({ uid: localId });
+
+    // 3. Initialize Firebase Auth (Silent)
+    signInAnonymously(auth).catch((err) => {
+        console.warn("Firebase Auth fallback:", err);
+    });
 
     const unsubscribe = onAuthStateChanged(auth, (usr) => {
       if (usr) {
-        setUser({ ...usr, uid: localUid }); // Forza l'uso dell'ID di sessione locale
+        // We override the Firebase UID with our session UID to guarantee stability across refreshes
+        setUser({ uid: localId, firebaseUid: usr.uid });
       }
     });
+
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!db || !hasJoined) return;
 
-    const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+    const cleanCode = roomCode.trim().toUpperCase();
+    const roomDocRef = doc(db, 'rooms', cleanCode);
+
     const unsubscribe = onSnapshot(roomDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        // Check if I was kicked out (e.g. admin deleted me)
+        const myId = user?.uid;
+        if (myId && data.participants && !data.participants.some(p => p.id === myId)) {
+             setHasJoined(false);
+             showNotice("Sei stato rimosso dalla stanza.");
+             return;
+        }
         setRoomData(data);
       }
     }, (error) => {
@@ -179,10 +214,12 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [hasJoined, roomCode]);
+  }, [hasJoined, roomCode, user?.uid]);
 
   useEffect(() => {
-    if (!roomData.currentAuction || roomData.isTimerPaused) return;
+    if (!roomData.currentAuction || roomData.isTimerPaused) {
+      return;
+    }
 
     const interval = setInterval(() => {
       const now = Date.now();
@@ -200,63 +237,67 @@ export default function App() {
 
   const handleAuctionExpired = async () => {
     if (!roomData.currentAuction) return;
+
     if (soundEnabled) playBuzzerSound();
 
     const winnerId = roomData.currentAuction.highBidderId;
     const finalPrice = roomData.currentAuction.currentBid;
     const player = roomData.currentAuction.player;
 
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(roomDocRef);
-        if (!snap.exists()) return;
-        const currentData = snap.data();
-        
-        // Prevent double assignments if already cleared
-        if (!currentData.currentAuction || currentData.currentAuction.player.id !== player.id) return;
+    const updatedParticipants = roomData.participants.map(p => {
+      if (p.id === winnerId) {
+        return {
+          ...p,
+          credits: p.credits - finalPrice,
+          roster: [...p.roster, { ...player, acquiredPrice: finalPrice }]
+        };
+      }
+      return p;
+    });
 
-        const updatedParts = currentData.participants.map(p => {
-          if (p.id === winnerId) {
-            return {
-              ...p,
-              credits: p.credits - finalPrice,
-              roster: [...p.roster, { ...player, acquiredPrice: finalPrice }]
-            };
-          }
-          return p;
-        });
+    const nextCallerIndex = getNextCallerIndex(roomData.activeCallerIndex, updatedParticipants);
 
-        const nextCallerIdx = getNextCallerIndex(currentData.activeCallerIndex, updatedParts, currentData);
+    const nextState = {
+      ...roomData,
+      participants: updatedParticipants,
+      boughtPlayers: [...(roomData.boughtPlayers || []), player.id],
+      currentAuction: null,
+      activeCallerIndex: nextCallerIndex
+    };
 
-        transaction.update(roomDocRef, {
-          participants: updatedParts,
-          boughtPlayers: [...(currentData.boughtPlayers || []), player.id],
-          currentAuction: null,
-          activeCallerIndex: nextCallerIdx
-        });
-      });
-      showNotice(`🔥 ASSEGNATO! ${player.name} a ${roomData.currentAuction.highBidderName} per ${finalPrice} cr!`);
-    } catch (err) {
-      console.error("Expired trans failed", err);
-    }
+    triggerStateUpdate(nextState);
+    showNotice(`🔥 ASSEGNATO! ${player.name} a ${roomData.currentAuction.highBidderName} per ${finalPrice} cr!`);
   };
 
-  const getNextCallerIndex = (currentIndex, participantsList, serverRoomData = roomData) => {
+  const getNextCallerIndex = (currentIndex, participantsList) => {
     if (!participantsList || participantsList.length === 0) return 0;
-    const step = serverRoomData.turnDirection === 'counter-clockwise' ? -1 : 1;
+    const step = roomData.turnDirection === 'counter-clockwise' ? -1 : 1;
     let nextIdx = (currentIndex + step + participantsList.length) % participantsList.length;
 
     let attempts = 0;
     while (attempts < participantsList.length) {
       const candidate = participantsList[nextIdx];
-      if (canParticipantBid(candidate, serverRoomData.phase)) {
+      if (canParticipantBid(candidate, roomData.phase)) {
         return nextIdx;
       }
       nextIdx = (nextIdx + step + participantsList.length) % participantsList.length;
       attempts++;
     }
     return currentIndex;
+  };
+
+  const triggerStateUpdate = async (newState) => {
+    setRoomData(newState);
+
+    if (db) {
+      try {
+        const cleanCode = (newState.code || roomCode).trim().toUpperCase();
+        const roomDocRef = doc(db, 'rooms', cleanCode);
+        await setDoc(roomDocRef, newState, { merge: true });
+      } catch (err) {
+        console.error("Firestore update failed:", err);
+      }
+    }
   };
 
   const canParticipantBid = (participant, currentPhaseId) => {
@@ -307,12 +348,13 @@ export default function App() {
       return;
     }
 
-    const currentUserId = user?.uid;
+    const currentUserId = user?.uid || getOrCreateUserId();
+
     const newParticipant = {
       id: currentUserId,
       name: managerName.trim(),
       teamName: teamName.trim(),
-      credits: 200,
+      credits: roomData.initialBudget || 200,
       roster: [],
       isAdmin: asAdmin
     };
@@ -320,9 +362,11 @@ export default function App() {
     if (db) {
       try {
         const roomDocRef = doc(db, 'rooms', cleanRoom);
+
+        // Atomic transaction to strictly prevent overwriting existing participants when joining
         await runTransaction(db, async (transaction) => {
           const roomSnap = await transaction.get(roomDocRef);
-          
+
           let serverData;
           if (!roomSnap.exists()) {
             serverData = {
@@ -344,11 +388,22 @@ export default function App() {
             const idx = list.findIndex(p => p.id === currentUserId);
 
             if (idx >= 0) {
-              list[idx] = { ...list[idx], name: newParticipant.name, teamName: newParticipant.teamName, isAdmin: asAdmin || list[idx].isAdmin };
+              // User exists, update name/team/admin but keep roster and credits intact
+              list[idx] = {
+                ...list[idx],
+                name: newParticipant.name,
+                teamName: newParticipant.teamName,
+                isAdmin: asAdmin || list[idx].isAdmin
+              };
             } else {
+              // Append safely
               list.push(newParticipant);
             }
-            transaction.update(roomDocRef, { participants: list });
+
+            transaction.update(roomDocRef, {
+              participants: list,
+              code: cleanRoom
+            });
             serverData.participants = list;
           }
           setRoomData(serverData);
@@ -359,12 +414,21 @@ export default function App() {
         showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}!`);
         return;
       } catch (err) {
-        console.error("Transazione fallita:", err);
+        console.error("Transazione Firestore fallita:", err);
+        showNotice("Errore di connessione. Riprova.");
+        return;
       }
     }
+
+    // Fallback Offline mode
+    const updatedParticipants = [...roomData.participants, newParticipant];
+    setRoomData(prev => ({ ...prev, participants: updatedParticipants, code: cleanRoom }));
+    setIsAdmin(asAdmin);
+    setHasJoined(true);
+    showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}! (Modalità Offline)`);
   };
 
-  const handleStartNomination = async () => {
+  const handleStartNomination = () => {
     if (!selectedNominee) {
       showNotice("Seleziona prima un giocatore dal database!");
       return;
@@ -398,14 +462,17 @@ export default function App() {
       ]
     };
 
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, { currentAuction: newAuction, isTimerPaused: false }, { merge: true });
-      setSelectedNominee(null);
-      setOpeningBid(1);
-      if (soundEnabled) playBidSound();
-      showNotice(`Asta aperta per ${selectedNominee.name} a base ${startPrice} cr!`);
-    } catch(e) {}
+    const nextState = {
+      ...roomData,
+      currentAuction: newAuction,
+      isTimerPaused: false
+    };
+
+    setSelectedNominee(null);
+    setOpeningBid(1);
+    if (soundEnabled) playBidSound();
+    triggerStateUpdate(nextState);
+    showNotice(`Asta aperta per ${selectedNominee.name} a base ${startPrice} cr!`);
   };
 
   const handlePlaceBid = async (deltaOrAmount, isAbsolute = false) => {
@@ -417,82 +484,81 @@ export default function App() {
       return;
     }
 
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(roomDocRef);
-        if (!snap.exists()) return;
-        const currentData = snap.data();
-        
-        if (!currentData.currentAuction) return;
+    const currentHighBid = roomData.currentAuction.currentBid;
+    const targetBid = isAbsolute ? parseInt(deltaOrAmount) : currentHighBid + deltaOrAmount;
 
-        const currentHighBid = currentData.currentAuction.currentBid;
-        const targetBid = isAbsolute ? parseInt(deltaOrAmount) : currentHighBid + deltaOrAmount;
-
-        if (isNaN(targetBid) || targetBid <= currentHighBid) throw new Error("Offerta troppo bassa");
-        const maxAllowed = getMaxBidAllowed(currentParticipant);
-        if (targetBid > maxAllowed) throw new Error("Crediti insufficienti");
-
-        const timerDuration = currentData.timerSeconds || 20;
-        const newHistoryEntry = {
-          bidderId: currentParticipant.id,
-          bidderName: currentParticipant.teamName,
-          amount: targetBid,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        };
-
-        const updatedAuction = {
-          ...currentData.currentAuction,
-          currentBid: targetBid,
-          highBidderId: currentParticipant.id,
-          highBidderName: currentParticipant.teamName,
-          endsAt: Date.now() + (timerDuration * 1000), 
-          bidHistory: [newHistoryEntry, ...(currentData.currentAuction.bidHistory || [])]
-        };
-
-        transaction.update(roomDocRef, {
-          currentAuction: updatedAuction,
-          isTimerPaused: false
-        });
-      });
-      if (soundEnabled) playBidSound();
-      setCustomBidAmount('');
-    } catch (err) {
-      showNotice(err.message);
+    if (isNaN(targetBid) || targetBid <= currentHighBid) {
+      showNotice(`L'offerta deve essere superiore all'offerta attuale (${currentHighBid} cr)!`);
+      return;
     }
+
+    const maxAllowed = getMaxBidAllowed(currentParticipant);
+    if (targetBid > maxAllowed) {
+      showNotice(`Non puoi offrire ${targetBid}! Limite massimo con riserva crediti per gli slot rimanenti: ${maxAllowed} cr.`);
+      return;
+    }
+
+    const timerDuration = roomData.timerSeconds || 20;
+    const newHistoryEntry = {
+      bidderId: currentParticipant.id,
+      bidderName: currentParticipant.teamName,
+      amount: targetBid,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
+
+    const updatedAuction = {
+      ...roomData.currentAuction,
+      currentBid: targetBid,
+      highBidderId: currentParticipant.id,
+      highBidderName: currentParticipant.teamName,
+      endsAt: Date.now() + (timerDuration * 1000), 
+      bidHistory: [newHistoryEntry, ...(roomData.currentAuction.bidHistory || [])]
+    };
+
+    const nextState = {
+      ...roomData,
+      currentAuction: updatedAuction,
+      isTimerPaused: false
+    };
+
+    if (soundEnabled) playBidSound();
+    setCustomBidAmount('');
+    triggerStateUpdate(nextState);
   };
 
-  const toggleTimerPause = async () => {
+  const toggleTimerPause = () => {
     if (!isAdmin) return;
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(roomDocRef);
-        const currentData = snap.data();
-        const nextPaused = !currentData.isTimerPaused;
-        let nextEndsAt = currentData.currentAuction?.endsAt;
+    const nextPaused = !roomData.isTimerPaused;
+    let nextEndsAt = roomData.currentAuction?.endsAt;
 
-        if (!nextPaused) {
-          nextEndsAt = Date.now() + (timeLeft * 1000);
-        }
+    if (!nextPaused) {
+      nextEndsAt = Date.now() + (timeLeft * 1000);
+    }
 
-        transaction.update(roomDocRef, {
-          isTimerPaused: nextPaused,
-          currentAuction: currentData.currentAuction ? { ...currentData.currentAuction, endsAt: nextEndsAt } : null
-        });
-      });
-    } catch(e) {}
+    const nextState = {
+      ...roomData,
+      isTimerPaused: nextPaused,
+      currentAuction: roomData.currentAuction ? {
+        ...roomData.currentAuction,
+        endsAt: nextEndsAt
+      } : null
+    };
+    triggerStateUpdate(nextState);
   };
 
-  const resetTimerSeconds = async (secs = 20) => {
+  const resetTimerSeconds = (secs = 20) => {
     if (!isAdmin || !roomData.currentAuction) return;
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, { currentAuction: { ...roomData.currentAuction, endsAt: Date.now() + (secs * 1000) } }, { merge: true });
-    } catch(e){}
+    const nextState = {
+      ...roomData,
+      currentAuction: {
+        ...roomData.currentAuction,
+        endsAt: Date.now() + (secs * 1000)
+      }
+    };
+    triggerStateUpdate(nextState);
   };
 
-  const undoLastBid = async () => {
+  const undoLastBid = () => {
     if (!isAdmin || !roomData.currentAuction || !roomData.currentAuction.bidHistory?.length) return;
     const history = [...roomData.currentAuction.bidHistory];
     if (history.length <= 1) {
@@ -502,61 +568,94 @@ export default function App() {
     history.shift(); 
     const prev = history[0];
 
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, {
-        currentAuction: {
-          ...roomData.currentAuction,
-          currentBid: prev.amount,
-          highBidderId: prev.bidderId,
-          highBidderName: prev.bidderName,
-          endsAt: Date.now() + (roomData.timerSeconds * 1000),
-          bidHistory: history
-        }
-      }, { merge: true });
-      showNotice(`Ultimo rilancio annullato. Offerta ripristinata a ${prev.amount} cr.`);
-    } catch(e){}
+    const nextState = {
+      ...roomData,
+      currentAuction: {
+        ...roomData.currentAuction,
+        currentBid: prev.amount,
+        highBidderId: prev.bidderId,
+        highBidderName: prev.bidderName,
+        endsAt: Date.now() + (roomData.timerSeconds * 1000),
+        bidHistory: history
+      }
+    };
+    triggerStateUpdate(nextState);
+    showNotice(`Ultimo rilancio annullato. Offerta ripristinata a ${prev.amount} cr.`);
   };
 
-  const forceCancelAuction = async () => {
+  const forceCancelAuction = () => {
     if (!isAdmin) return;
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, { currentAuction: null }, { merge: true });
-      showNotice("Asta annullata dall'amministratore.");
-    } catch(e){}
+    triggerStateUpdate({ ...roomData, currentAuction: null });
+    showNotice("Asta annullata dall'amministratore.");
   };
 
-  const setAuctionPhase = async (phaseId) => {
+  const setAuctionPhase = (phaseId) => {
     if (!isAdmin) return;
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, { phase: phaseId }, { merge: true });
-      showNotice(`Fase d'asta cambiata in: ${PHASES.find(p => p.id === phaseId)?.name}`);
-    } catch(e){}
+    triggerStateUpdate({ ...roomData, phase: phaseId });
+    showNotice(`Fase d'asta cambiata in: ${PHASES.find(p => p.id === phaseId)?.name}`);
   };
 
-  const forcePassTurn = async () => {
+  const forcePassTurn = () => {
     if (!isAdmin) return;
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      const nextIdx = getNextCallerIndex(roomData.activeCallerIndex, roomData.participants, roomData);
-      await setDoc(roomDocRef, { activeCallerIndex: nextIdx }, { merge: true });
-      showNotice(`Turno passato manualmente.`);
-    } catch(e){}
+    const nextIdx = getNextCallerIndex(roomData.activeCallerIndex, roomData.participants);
+    triggerStateUpdate({ ...roomData, activeCallerIndex: nextIdx });
+    showNotice(`Turno passato manualmente.`);
   };
 
-  const toggleTurnDirection = async () => {
+  const toggleTurnDirection = () => {
     if (!isAdmin) return;
     const nextDir = roomData.turnDirection === 'clockwise' ? 'counter-clockwise' : 'clockwise';
-    try {
-      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-      await setDoc(roomDocRef, { turnDirection: nextDir }, { merge: true });
-    } catch(e){}
+    triggerStateUpdate({ ...roomData, turnDirection: nextDir });
   };
 
   const handleLeaveRoom = () => {
     setHasJoined(false);
+  };
+
+  const injectMockParticipants = () => {
+    const bots = [
+      { id: 'bot_1', name: 'Marco (Lakers)', team: 'Showtime Lakers', credits: 200, roster: [], isAdmin: false },
+      { id: 'bot_2', name: 'Luca (Celtics)', team: 'Boston Pride', credits: 200, roster: [], isAdmin: false }
+    ];
+
+    const currentList = [...roomData.participants];
+    bots.forEach(b => {
+      if (!currentList.some(p => p.id === b.id)) {
+        currentList.push(b);
+      }
+    });
+    triggerStateUpdate({ ...roomData, participants: currentList });
+    showNotice("Aggiunti 2 manager virtuali per test!");
+  };
+
+  const simulateBotBid = () => {
+    if (!roomData.currentAuction) return;
+    const bots = roomData.participants.filter(p => p.id.startsWith('bot_') && p.id !== roomData.currentAuction.highBidderId);
+    if (!bots.length) return;
+    
+    const bot = bots[Math.floor(Math.random() * bots.length)];
+    const newBid = roomData.currentAuction.currentBid + Math.floor(Math.random() * 3) + 1;
+
+    const timerDuration = roomData.timerSeconds || 20;
+    const updatedAuction = {
+      ...roomData.currentAuction,
+      currentBid: newBid,
+      highBidderId: bot.id,
+      highBidderName: bot.teamName,
+      endsAt: Date.now() + (timerDuration * 1000),
+      bidHistory: [
+        {
+          bidderId: bot.id,
+          bidderName: bot.teamName,
+          amount: newBid,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        },
+        ...(roomData.currentAuction.bidHistory || [])
+      ]
+    };
+
+    if (soundEnabled) playBidSound();
+    triggerStateUpdate({ ...roomData, currentAuction: updatedAuction, isTimerPaused: false });
   };
 
   const showNotice = (msg) => {
