@@ -11,8 +11,6 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { 
   getFirestore, doc, setDoc, onSnapshot
 } from 'firebase/firestore';
-
-import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 
 
