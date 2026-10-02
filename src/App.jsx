@@ -4942,7 +4942,14 @@ const PHASES = [
 export default function App() {
   // Auth & Session
   const [user, setUser] = useState(null);
-  const [roomCode, setRoomCode] = useState('DUNKEST25');
+  const [roomCode, setRoomCode] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return (params.get('room') || 'DUNKEST25').toUpperCase();
+    } catch {
+      return 'DUNKEST25';
+    }
+  });
   const [teamName, setTeamName] = useState('');
   const [managerName, setManagerName] = useState('');
   const [hasJoined, setHasJoined] = useState(false);
@@ -5010,8 +5017,7 @@ export default function App() {
   useEffect(() => {
     if (!db || !hasJoined) return;
 
-    const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${roomCode.toUpperCase()}`);
-
+    const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
     const unsubscribe = onSnapshot(roomDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
@@ -5099,7 +5105,7 @@ export default function App() {
 
     if (db) {
       try {
-        const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${roomCode.toUpperCase()}`);
+        const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
         await setDoc(roomDocRef, newState, { merge: true });
       } catch (err) {
         console.error("Firestore update failed:", err);
