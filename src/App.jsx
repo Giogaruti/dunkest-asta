@@ -7,10 +7,13 @@ import {
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { 
-  getFirestore, doc, setDoc, onSnapshot, runTransaction
+  getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction
 } from 'firebase/firestore';
+
+// Assicurati che questo file esista nella cartella src/
+import RAW_PLAYERS_JSON from './players.json';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC1jop2ZlePaMqL-6Ng5ZDpQNyxVtDMS5A",
@@ -26,8 +29,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Generate or retrieve a persistent ID for the current browser session.
-// This survives page reloads and prevents the user from being kicked out or duplicating.
+// ID univoco del dispositivo persistente per sessione/scheda
 const getOrCreateUserId = () => {
   let uid = sessionStorage.getItem('dunkest_session_uid');
   if (!uid) {
@@ -36,6 +38,28 @@ const getOrCreateUserId = () => {
   }
   return uid;
 };
+
+// Conversione immediata e sincrona del JSON importato
+const NBA_PLAYERS_DB = RAW_PLAYERS_JSON
+  .filter(p => p.Position)
+  .map((p, index) => {
+    let role = 'G';
+    if (p.Position === 'Forward') role = 'F';
+    if (p.Position === 'Center') role = 'C';
+    if (p.Position === 'Head Coach') role = 'HC';
+
+    const priceStr = p["Cr 26/27"] || "1,0";
+    const priceParsed = parseFloat(priceStr.replace(',', '.')) || 4.0;
+
+    return {
+      id: `p_${index}`,
+      name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
+      team: p.Team || '',
+      role: role,
+      basePrice: priceParsed,
+      tier: p.Position
+    };
+  });
 
 const playBuzzerSound = () => {
   try {
@@ -51,9 +75,7 @@ const playBuzzerSound = () => {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.4);
-  } catch (e) {
-    // Audio might be blocked before first user gesture
-  }
+  } catch (e) {}
 };
 
 const playBidSound = () => {
@@ -73,13 +95,12 @@ const playBidSound = () => {
   } catch (e) {}
 };
 
-// --- SCHEMA DUNKEST CHE INCLUDE L'ALLENATORE (11 Giocatori Totali) ---
 const TOTAL_ROSTER_SIZE = 11;
 const ROSTER_SLOT_SCHEMA = {
   G: { total: 4 },
   F: { total: 4 },
   C: { total: 2 },
-  HC: { total: 1 } // Head Coach
+  HC: { total: 1 } 
 };
 
 const PHASES = [
@@ -92,28 +113,27 @@ const PHASES = [
 
 export default function App() {
   const [user, setUser] = useState(null);
+  
+  // Ripristino intelligente della sessione da sessionStorage all'avvio
   const [roomCode, setRoomCode] = useState(() => {
     try {
+      const savedRoom = sessionStorage.getItem('dunk_roomCode');
+      if (savedRoom) return savedRoom;
+
       const params = new URLSearchParams(window.location.search);
-      const urlRoom = params.get('room');
-      if (urlRoom) return urlRoom.trim().toUpperCase();
-      return 'DUNKEST25';
+      return (params.get('room') || 'DUNKEST25').toUpperCase();
     } catch {
       return 'DUNKEST25';
     }
   });
 
-  const [teamName, setTeamName] = useState('');
-  const [managerName, setManagerName] = useState('');
-  const [hasJoined, setHasJoined] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [teamName, setTeamName] = useState(() => sessionStorage.getItem('dunk_teamName') || '');
+  const [managerName, setManagerName] = useState(() => sessionStorage.getItem('dunk_managerName') || '');
+  const [hasJoined, setHasJoined] = useState(() => sessionStorage.getItem('dunk_hasJoined') === 'true');
+  const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem('dunk_isAdmin') === 'true');
   const [soundEnabled, setSoundEnabled] = useState(true);
-
-  const [activeTab, setActiveTab] = useState('auction');
+  const [activeTab, setActiveTab] = useState('auction'); 
   const [showQRModal, setShowQRModal] = useState(false);
-  
-  const [playersDB, setPlayersDB] = useState([]);
-  const [isPlayersLoading, setIsPlayersLoading] = useState(true);
 
   const [roomData, setRoomData] = useState({
     code: 'DUNKEST25',
@@ -136,77 +156,38 @@ export default function App() {
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
-    // 1. Fetch players from external local JSON file
-    const fetchPlayers = async () => {
+    let localUid = sessionStorage.getItem('dunk_uid');
+    if (!localUid) {
+      localUid = 'usr_' + Math.random().toString(36).substr(2, 9);
+      sessionStorage.setItem('dunk_uid', localUid);
+    }
+
+    const initAuth = async () => {
       try {
-        // Assuming the file is placed in the public/ folder as players.json
-        const response = await fetch('/players.json');
-        if (!response.ok) throw new Error('Network response was not ok');
-        const rawJson = await response.json();
-        
-        const mappedPlayers = rawJson.map((p, index) => {
-          let role = 'G';
-          if (p.Position === 'Forward') role = 'F';
-          if (p.Position === 'Center') role = 'C';
-          if (p.Position === 'Head Coach') role = 'HC';
-
-          const priceParsed = parseFloat((p["Cr 26/27"] || "1,0").replace(',', '.')) || 4.0;
-
-          return {
-            id: `p_${index}`,
-            name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
-            team: p.Team,
-            role: role,
-            basePrice: priceParsed,
-            tier: 'Standard'
-          };
-        });
-        setPlayersDB(mappedPlayers);
-      } catch (error) {
-        console.error("Failed to load players.json:", error);
-        showNotice("Errore nel caricamento del file giocatori. Assicurati che players.json esista.");
-      } finally {
-        setIsPlayersLoading(false);
+        await setPersistence(auth, browserSessionPersistence);
+        await signInAnonymously(auth);
+      } catch (err) {
+        console.warn("Auth offline/anonimo fallback attivo.");
+        setUser({ uid: localUid, isAnonymous: true });
       }
     };
-
-    fetchPlayers();
-
-    // 2. Initialize stable User ID immediately
-    const localId = getOrCreateUserId();
-    setUser({ uid: localId });
-
-    // 3. Initialize Firebase Auth (Silent)
-    signInAnonymously(auth).catch((err) => {
-        console.warn("Firebase Auth fallback:", err);
-    });
+    initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, (usr) => {
       if (usr) {
-        // We override the Firebase UID with our session UID to guarantee stability across refreshes
-        setUser({ uid: localId, firebaseUid: usr.uid });
+        setUser({ ...usr, uid: localUid }); // Forza l'uso dell'ID di sessione locale
       }
     });
-
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!db || !hasJoined) return;
 
-    const cleanCode = roomCode.trim().toUpperCase();
-    const roomDocRef = doc(db, 'rooms', cleanCode);
-
+    const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
     const unsubscribe = onSnapshot(roomDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        // Check if I was kicked out (e.g. admin deleted me)
-        const myId = user?.uid;
-        if (myId && data.participants && !data.participants.some(p => p.id === myId)) {
-             setHasJoined(false);
-             showNotice("Sei stato rimosso dalla stanza.");
-             return;
-        }
         setRoomData(data);
       }
     }, (error) => {
@@ -214,7 +195,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [hasJoined, roomCode, user?.uid]);
+  }, [hasJoined, roomCode]);
 
   useEffect(() => {
     if (!roomData.currentAuction || roomData.isTimerPaused) {
@@ -238,46 +219,65 @@ export default function App() {
   const handleAuctionExpired = async () => {
     if (!roomData.currentAuction) return;
 
-    if (soundEnabled) playBuzzerSound();
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(roomDocRef);
+        if (!snap.exists()) return;
+        const currentData = snap.data();
+        
+        // Prevent double assignments
+        if (!currentData.currentAuction) return;
 
-    const winnerId = roomData.currentAuction.highBidderId;
-    const finalPrice = roomData.currentAuction.currentBid;
-    const player = roomData.currentAuction.player;
+        // VERIFICA SUL SERVER: Il timer del server è davvero scaduto? 
+        // Qualcuno potrebbe aver rilanciato in quest'ultimo istante.
+        if (Date.now() < currentData.currentAuction.serverExpirationThreshold) {
+            // L'asta è ancora viva sul server, interrompi l'assegnazione locale
+            return;
+        }
 
-    const updatedParticipants = roomData.participants.map(p => {
-      if (p.id === winnerId) {
-        return {
-          ...p,
-          credits: p.credits - finalPrice,
-          roster: [...p.roster, { ...player, acquiredPrice: finalPrice }]
-        };
-      }
-      return p;
-    });
+        const winnerId = currentData.currentAuction.highBidderId;
+        const finalPrice = currentData.currentAuction.currentBid;
+        const player = currentData.currentAuction.player;
 
-    const nextCallerIndex = getNextCallerIndex(roomData.activeCallerIndex, updatedParticipants);
+        const updatedParts = currentData.participants.map(p => {
+          if (p.id === winnerId) {
+            return {
+              ...p,
+              credits: p.credits - finalPrice,
+              roster: [...p.roster, { ...player, acquiredPrice: finalPrice }]
+            };
+          }
+          return p;
+        });
 
-    const nextState = {
-      ...roomData,
-      participants: updatedParticipants,
-      boughtPlayers: [...(roomData.boughtPlayers || []), player.id],
-      currentAuction: null,
-      activeCallerIndex: nextCallerIndex
-    };
+        const nextCallerIdx = getNextCallerIndex(currentData.activeCallerIndex, updatedParts, currentData);
 
-    triggerStateUpdate(nextState);
-    showNotice(`🔥 ASSEGNATO! ${player.name} a ${roomData.currentAuction.highBidderName} per ${finalPrice} cr!`);
+        transaction.update(roomDocRef, {
+          participants: updatedParts,
+          boughtPlayers: [...(currentData.boughtPlayers || []), player.id],
+          currentAuction: null,
+          activeCallerIndex: nextCallerIdx
+        });
+        
+        // Suona solo quando la transazione passa e viene assegnato
+        if (soundEnabled) playBuzzerSound(); 
+        showNotice(`🔥 ASSEGNATO! ${player.name} a ${currentData.currentAuction.highBidderName} per ${finalPrice} cr!`);
+      });
+    } catch (err) {
+      // Ignora l'errore se è bloccato (es. qualcuno ha offerto all'ultimo millisecondo)
+    }
   };
 
-  const getNextCallerIndex = (currentIndex, participantsList) => {
+  const getNextCallerIndex = (currentIndex, participantsList, serverRoomData = roomData) => {
     if (!participantsList || participantsList.length === 0) return 0;
-    const step = roomData.turnDirection === 'counter-clockwise' ? -1 : 1;
+    const step = serverRoomData.turnDirection === 'counter-clockwise' ? -1 : 1;
     let nextIdx = (currentIndex + step + participantsList.length) % participantsList.length;
 
     let attempts = 0;
     while (attempts < participantsList.length) {
       const candidate = participantsList[nextIdx];
-      if (canParticipantBid(candidate, roomData.phase)) {
+      if (canParticipantBid(candidate, serverRoomData.phase)) {
         return nextIdx;
       }
       nextIdx = (nextIdx + step + participantsList.length) % participantsList.length;
@@ -288,7 +288,6 @@ export default function App() {
 
   const triggerStateUpdate = async (newState) => {
     setRoomData(newState);
-
     if (db) {
       try {
         const cleanCode = (newState.code || roomCode).trim().toUpperCase();
@@ -348,13 +347,12 @@ export default function App() {
       return;
     }
 
-    const currentUserId = user?.uid || getOrCreateUserId();
-
+    const currentUserId = user?.uid;
     const newParticipant = {
       id: currentUserId,
       name: managerName.trim(),
       teamName: teamName.trim(),
-      credits: roomData.initialBudget || 200,
+      credits: 200, 
       roster: [],
       isAdmin: asAdmin
     };
@@ -362,11 +360,9 @@ export default function App() {
     if (db) {
       try {
         const roomDocRef = doc(db, 'rooms', cleanRoom);
-
-        // Atomic transaction to strictly prevent overwriting existing participants when joining
         await runTransaction(db, async (transaction) => {
           const roomSnap = await transaction.get(roomDocRef);
-
+          
           let serverData;
           if (!roomSnap.exists()) {
             serverData = {
@@ -388,47 +384,34 @@ export default function App() {
             const idx = list.findIndex(p => p.id === currentUserId);
 
             if (idx >= 0) {
-              // User exists, update name/team/admin but keep roster and credits intact
-              list[idx] = {
-                ...list[idx],
-                name: newParticipant.name,
-                teamName: newParticipant.teamName,
-                isAdmin: asAdmin || list[idx].isAdmin
-              };
+              list[idx] = { ...list[idx], name: newParticipant.name, teamName: newParticipant.teamName, isAdmin: asAdmin || list[idx].isAdmin };
             } else {
-              // Append safely
               list.push(newParticipant);
             }
-
-            transaction.update(roomDocRef, {
-              participants: list,
-              code: cleanRoom
-            });
+            transaction.update(roomDocRef, { participants: list });
             serverData.participants = list;
           }
           setRoomData(serverData);
         });
+
+        // Salva le info della sessione per l'auto-riconnessione in caso di F5
+        sessionStorage.setItem('dunk_roomCode', cleanRoom);
+        sessionStorage.setItem('dunk_teamName', newParticipant.teamName);
+        sessionStorage.setItem('dunk_managerName', newParticipant.name);
+        sessionStorage.setItem('dunk_hasJoined', 'true');
+        sessionStorage.setItem('dunk_isAdmin', String(asAdmin));
 
         setIsAdmin(asAdmin);
         setHasJoined(true);
         showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}!`);
         return;
       } catch (err) {
-        console.error("Transazione Firestore fallita:", err);
-        showNotice("Errore di connessione. Riprova.");
-        return;
+        console.error("Transazione fallita:", err);
       }
     }
-
-    // Fallback Offline mode
-    const updatedParticipants = [...roomData.participants, newParticipant];
-    setRoomData(prev => ({ ...prev, participants: updatedParticipants, code: cleanRoom }));
-    setIsAdmin(asAdmin);
-    setHasJoined(true);
-    showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}! (Modalità Offline)`);
   };
 
-  const handleStartNomination = () => {
+  const handleStartNomination = async () => {
     if (!selectedNominee) {
       showNotice("Seleziona prima un giocatore dal database!");
       return;
@@ -446,12 +429,18 @@ export default function App() {
     }
 
     const timerDuration = roomData.timerSeconds || 20;
+    
+    // Sicurezza: L'asta scade sul SERVER leggermente dopo (es. + 1.5 sec) per dare tempo alle transazioni in volo
+    const localEndsAt = Date.now() + (timerDuration * 1000);
+    const serverExpirationThreshold = localEndsAt + 1500; 
+
     const newAuction = {
       player: selectedNominee,
       currentBid: startPrice,
       highBidderId: currentParticipant.id,
       highBidderName: currentParticipant.teamName,
-      endsAt: Date.now() + (timerDuration * 1000),
+      endsAt: localEndsAt,
+      serverExpirationThreshold: serverExpirationThreshold,
       bidHistory: [
         {
           bidderId: currentParticipant.id,
@@ -462,17 +451,14 @@ export default function App() {
       ]
     };
 
-    const nextState = {
-      ...roomData,
-      currentAuction: newAuction,
-      isTimerPaused: false
-    };
-
-    setSelectedNominee(null);
-    setOpeningBid(1);
-    if (soundEnabled) playBidSound();
-    triggerStateUpdate(nextState);
-    showNotice(`Asta aperta per ${selectedNominee.name} a base ${startPrice} cr!`);
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await setDoc(roomDocRef, { currentAuction: newAuction, isTimerPaused: false }, { merge: true });
+      setSelectedNominee(null);
+      setOpeningBid(1);
+      if (soundEnabled) playBidSound();
+      showNotice(`Asta aperta per ${selectedNominee.name} a base ${startPrice} cr!`);
+    } catch(e) {}
   };
 
   const handlePlaceBid = async (deltaOrAmount, isAbsolute = false) => {
@@ -484,81 +470,94 @@ export default function App() {
       return;
     }
 
-    const currentHighBid = roomData.currentAuction.currentBid;
-    const targetBid = isAbsolute ? parseInt(deltaOrAmount) : currentHighBid + deltaOrAmount;
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(roomDocRef);
+        if (!snap.exists()) return;
+        const currentData = snap.data();
+        
+        if (!currentData.currentAuction) throw new Error("Asta già chiusa!");
 
-    if (isNaN(targetBid) || targetBid <= currentHighBid) {
-      showNotice(`L'offerta deve essere superiore all'offerta attuale (${currentHighBid} cr)!`);
-      return;
+        // Controlla se l'asta è davvero chiusa anche considerando il delay di volo
+        if (Date.now() > currentData.currentAuction.serverExpirationThreshold) {
+           throw new Error("L'asta è già terminata.");
+        }
+
+        const currentHighBid = currentData.currentAuction.currentBid;
+        const targetBid = isAbsolute ? parseInt(deltaOrAmount) : currentHighBid + deltaOrAmount;
+
+        if (isNaN(targetBid) || targetBid <= currentHighBid) throw new Error(`L'offerta deve essere superiore a ${currentHighBid}`);
+        
+        // Usa i dati aggiornati del server per calcolare il maxAllowed
+        const serverParticipant = currentData.participants.find(p => p.id === currentParticipant.id);
+        const maxAllowed = getMaxBidAllowed(serverParticipant || currentParticipant);
+        if (targetBid > maxAllowed) throw new Error(`Supera il tetto massimo (${maxAllowed} cr)`);
+
+        const timerDuration = currentData.timerSeconds || 20;
+        const localEndsAt = Date.now() + (timerDuration * 1000);
+
+        const newHistoryEntry = {
+          bidderId: currentParticipant.id,
+          bidderName: currentParticipant.teamName,
+          amount: targetBid,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        };
+
+        const updatedAuction = {
+          ...currentData.currentAuction,
+          currentBid: targetBid,
+          highBidderId: currentParticipant.id,
+          highBidderName: currentParticipant.teamName,
+          endsAt: localEndsAt, 
+          serverExpirationThreshold: localEndsAt + 1500, // Aggiorna tolleranza
+          bidHistory: [newHistoryEntry, ...(currentData.currentAuction.bidHistory || [])]
+        };
+
+        transaction.update(roomDocRef, {
+          currentAuction: updatedAuction,
+          isTimerPaused: false
+        });
+      });
+      if (soundEnabled) playBidSound();
+      setCustomBidAmount('');
+    } catch (err) {
+      showNotice(err.message);
     }
-
-    const maxAllowed = getMaxBidAllowed(currentParticipant);
-    if (targetBid > maxAllowed) {
-      showNotice(`Non puoi offrire ${targetBid}! Limite massimo con riserva crediti per gli slot rimanenti: ${maxAllowed} cr.`);
-      return;
-    }
-
-    const timerDuration = roomData.timerSeconds || 20;
-    const newHistoryEntry = {
-      bidderId: currentParticipant.id,
-      bidderName: currentParticipant.teamName,
-      amount: targetBid,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    };
-
-    const updatedAuction = {
-      ...roomData.currentAuction,
-      currentBid: targetBid,
-      highBidderId: currentParticipant.id,
-      highBidderName: currentParticipant.teamName,
-      endsAt: Date.now() + (timerDuration * 1000), 
-      bidHistory: [newHistoryEntry, ...(roomData.currentAuction.bidHistory || [])]
-    };
-
-    const nextState = {
-      ...roomData,
-      currentAuction: updatedAuction,
-      isTimerPaused: false
-    };
-
-    if (soundEnabled) playBidSound();
-    setCustomBidAmount('');
-    triggerStateUpdate(nextState);
   };
 
-  const toggleTimerPause = () => {
+  const toggleTimerPause = async () => {
     if (!isAdmin) return;
-    const nextPaused = !roomData.isTimerPaused;
-    let nextEndsAt = roomData.currentAuction?.endsAt;
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(roomDocRef);
+        if(!snap.exists()) return;
+        const currentData = snap.data();
+        const nextPaused = !currentData.isTimerPaused;
+        let nextEndsAt = currentData.currentAuction?.endsAt;
 
-    if (!nextPaused) {
-      nextEndsAt = Date.now() + (timeLeft * 1000);
-    }
+        if (!nextPaused) {
+          nextEndsAt = Date.now() + (timeLeft * 1000);
+        }
 
-    const nextState = {
-      ...roomData,
-      isTimerPaused: nextPaused,
-      currentAuction: roomData.currentAuction ? {
-        ...roomData.currentAuction,
-        endsAt: nextEndsAt
-      } : null
-    };
-    triggerStateUpdate(nextState);
+        transaction.update(roomDocRef, {
+          isTimerPaused: nextPaused,
+          currentAuction: currentData.currentAuction ? { ...currentData.currentAuction, endsAt: nextEndsAt } : null
+        });
+      });
+    } catch(e) {}
   };
 
-  const resetTimerSeconds = (secs = 20) => {
+  const resetTimerSeconds = async (secs = 20) => {
     if (!isAdmin || !roomData.currentAuction) return;
-    const nextState = {
-      ...roomData,
-      currentAuction: {
-        ...roomData.currentAuction,
-        endsAt: Date.now() + (secs * 1000)
-      }
-    };
-    triggerStateUpdate(nextState);
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await setDoc(roomDocRef, { currentAuction: { ...roomData.currentAuction, endsAt: Date.now() + (secs * 1000) } }, { merge: true });
+    } catch(e){}
   };
 
-  const undoLastBid = () => {
+  const undoLastBid = async () => {
     if (!isAdmin || !roomData.currentAuction || !roomData.currentAuction.bidHistory?.length) return;
     const history = [...roomData.currentAuction.bidHistory];
     if (history.length <= 1) {
@@ -568,47 +567,64 @@ export default function App() {
     history.shift(); 
     const prev = history[0];
 
-    const nextState = {
-      ...roomData,
-      currentAuction: {
-        ...roomData.currentAuction,
-        currentBid: prev.amount,
-        highBidderId: prev.bidderId,
-        highBidderName: prev.bidderName,
-        endsAt: Date.now() + (roomData.timerSeconds * 1000),
-        bidHistory: history
-      }
-    };
-    triggerStateUpdate(nextState);
-    showNotice(`Ultimo rilancio annullato. Offerta ripristinata a ${prev.amount} cr.`);
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await setDoc(roomDocRef, {
+        currentAuction: {
+          ...roomData.currentAuction,
+          currentBid: prev.amount,
+          highBidderId: prev.bidderId,
+          highBidderName: prev.bidderName,
+          endsAt: Date.now() + (roomData.timerSeconds * 1000),
+          bidHistory: history
+        }
+      }, { merge: true });
+      showNotice(`Ultimo rilancio annullato. Offerta ripristinata a ${prev.amount} cr.`);
+    } catch(e){}
   };
 
-  const forceCancelAuction = () => {
+  const forceCancelAuction = async () => {
     if (!isAdmin) return;
-    triggerStateUpdate({ ...roomData, currentAuction: null });
-    showNotice("Asta annullata dall'amministratore.");
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await setDoc(roomDocRef, { currentAuction: null }, { merge: true });
+      showNotice("Asta annullata dall'amministratore.");
+    } catch(e){}
   };
 
-  const setAuctionPhase = (phaseId) => {
+  const setAuctionPhase = async (phaseId) => {
     if (!isAdmin) return;
-    triggerStateUpdate({ ...roomData, phase: phaseId });
-    showNotice(`Fase d'asta cambiata in: ${PHASES.find(p => p.id === phaseId)?.name}`);
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await setDoc(roomDocRef, { phase: phaseId }, { merge: true });
+      showNotice(`Fase d'asta cambiata in: ${PHASES.find(p => p.id === phaseId)?.name}`);
+    } catch(e){}
   };
 
-  const forcePassTurn = () => {
+  const forcePassTurn = async () => {
     if (!isAdmin) return;
-    const nextIdx = getNextCallerIndex(roomData.activeCallerIndex, roomData.participants);
-    triggerStateUpdate({ ...roomData, activeCallerIndex: nextIdx });
-    showNotice(`Turno passato manualmente.`);
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      const nextIdx = getNextCallerIndex(roomData.activeCallerIndex, roomData.participants, roomData);
+      await setDoc(roomDocRef, { activeCallerIndex: nextIdx }, { merge: true });
+      showNotice(`Turno passato manualmente.`);
+    } catch(e){}
   };
 
-  const toggleTurnDirection = () => {
+  const toggleTurnDirection = async () => {
     if (!isAdmin) return;
     const nextDir = roomData.turnDirection === 'clockwise' ? 'counter-clockwise' : 'clockwise';
-    triggerStateUpdate({ ...roomData, turnDirection: nextDir });
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await setDoc(roomDocRef, { turnDirection: nextDir }, { merge: true });
+    } catch(e){}
   };
 
   const handleLeaveRoom = () => {
+    // Pulisce la sessione per evitare l'auto-riconnessione automatica
+    sessionStorage.removeItem('dunk_hasJoined');
+    sessionStorage.removeItem('dunk_roomCode');
+    sessionStorage.removeItem('dunk_isAdmin');
     setHasJoined(false);
   };
 
@@ -684,6 +700,9 @@ export default function App() {
   }, [roomData.boughtPlayers, currentPhaseConfig, searchTerm]);
 
   if (!hasJoined) {
+    // Determina se l'utente è arrivato tramite URL (QR Code) controllando se c'è un parametro room
+    const isFromQRCode = window.location.search.includes('room=');
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-600/10 via-purple-900/10 to-transparent pointer-events-none" />
@@ -707,7 +726,10 @@ export default function App() {
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                 placeholder="es. DUNKEST25"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-amber-400 font-mono font-bold tracking-widest focus:outline-none focus:border-amber-500 transition"
+                disabled={isFromQRCode} // Disabilita il campo se arrivano da QR
+                className={`w-full px-4 py-3 border rounded-xl font-mono font-bold tracking-widest focus:outline-none transition ${
+                   isFromQRCode ? 'bg-slate-900 border-slate-800 text-amber-600 cursor-not-allowed' : 'bg-slate-950 border-slate-700 text-amber-400 focus:border-amber-500'
+                }`}
               />
             </div>
 
@@ -733,7 +755,7 @@ export default function App() {
               />
             </div>
 
-            <div className="pt-2 grid grid-cols-2 gap-3">
+            <div className={`pt-2 grid gap-3 ${isFromQRCode ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <button
                 onClick={() => handleJoinOrCreate(false)}
                 className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold rounded-xl flex items-center justify-center space-x-2 border border-slate-700 transition shadow-md"
@@ -742,13 +764,15 @@ export default function App() {
                 <span>Entra (Manager)</span>
               </button>
 
-              <button
-                onClick={() => handleJoinOrCreate(true)}
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 text-slate-950 font-black rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-orange-500/25 transition"
-              >
-                <ShieldAlert className="w-4 h-4 text-slate-950" />
-                <span>Crea Host / Admin</span>
-              </button>
+              {!isFromQRCode && (
+                <button
+                  onClick={() => handleJoinOrCreate(true)}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 text-slate-950 font-black rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-orange-500/25 transition"
+                >
+                  <ShieldAlert className="w-4 h-4 text-slate-950" />
+                  <span>Crea Host / Admin</span>
+                </button>
+              )}
             </div>
 
             <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-400 space-y-1">
