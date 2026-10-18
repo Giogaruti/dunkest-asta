@@ -166,7 +166,7 @@ export default function App() {
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}players.json`);
+        const response = await fetch('players.json');
         if (!response.ok) throw new Error('Network response was not ok');
         const rawJson = await response.json();
         
