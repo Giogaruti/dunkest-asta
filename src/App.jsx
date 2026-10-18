@@ -3,7 +3,7 @@ import {
   Trophy, Users, Play, Pause, RotateCcw, Clock,
   Search, ShieldAlert, Award, AlertCircle,
   Volume2, VolumeX, QrCode, Download, Settings,
-  LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2, Ban
+  LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2, Ban, CheckCircle
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
@@ -138,7 +138,6 @@ export default function App() {
   const [playersDB, setPlayersDB] = useState([]);
   const [isPlayersLoading, setIsPlayersLoading] = useState(true);
   
-  // Extra Creation Fields
   const [maxUsers, setMaxUsers] = useState(8);
 
   const [roomData, setRoomData] = useState({
@@ -152,7 +151,8 @@ export default function App() {
     turnDirection: 'clockwise',
     currentAuction: null,
     participants: [],
-    boughtPlayers: []
+    boughtPlayers: [],
+    completedAuctions: []
   });
 
   const [timeLeft, setTimeLeft] = useState(20);
@@ -171,7 +171,7 @@ export default function App() {
         const rawJson = await response.json();
         
         const mappedPlayers = rawJson.map((p, index) => {
-          if (p.Position === 'Head Coach') return null; // Eliminiamo i coach
+          if (p.Position === 'Head Coach') return null; 
           
           let role = 'G';
           if (p.Position === 'Forward') role = 'F';
@@ -253,7 +253,7 @@ export default function App() {
 
   /* STREAMING_CHUNK:Timezone-Independent Timer Logic... */
   useEffect(() => {
-    if (!roomData.currentAuction) return;
+    if (!roomData.currentAuction || roomData.currentAuction.status === 'pending') return;
     if (roomData.isTimerPaused) {
        setTimeLeft(roomData.currentAuction.pausedTimeLeft || 20);
        return;
@@ -276,9 +276,9 @@ export default function App() {
     return () => clearInterval(interval);
   }, [roomData.currentAuction, roomData.isTimerPaused]);
 
-  /* STREAMING_CHUNK:Processing Robust Auction Expiration... */
+  /* STREAMING_CHUNK:Processing Robust Auction Expiration & Confirmation... */
   const handleAuctionExpired = async () => {
-    if (!roomData.currentAuction) return;
+    if (!roomData.currentAuction || roomData.currentAuction.status === 'pending') return;
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
       await runTransaction(db, async (transaction) => {
@@ -286,11 +286,58 @@ export default function App() {
         if (!snap.exists()) return;
         const currentData = snap.data();
         
-        if (!currentData.currentAuction) return;
+        if (!currentData.currentAuction || currentData.currentAuction.status === 'pending') return;
 
         if (!currentData.isTimerPaused && getNow() < currentData.currentAuction.serverExpirationThreshold) {
             return;
         }
+
+        transaction.update(roomDocRef, {
+          currentAuction: {
+            ...currentData.currentAuction,
+            status: 'pending'
+          }
+        });
+        
+        if (soundEnabled) playBuzzerSound(); 
+      });
+    } catch (err) {}
+  };
+
+  const forceEndAuction = async () => {
+    if (!isAdmin || !roomData.currentAuction || roomData.currentAuction.status === 'pending') return;
+    try {
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(roomDocRef);
+        if (!snap.exists()) return;
+        const currentData = snap.data();
+        
+        if (!currentData.currentAuction || currentData.currentAuction.status === 'pending') return;
+
+        transaction.update(roomDocRef, {
+          currentAuction: {
+            ...currentData.currentAuction,
+            status: 'pending'
+          }
+        });
+        
+        if (soundEnabled) playBuzzerSound(); 
+      });
+    } catch (err) {}
+  };
+
+  const confirmAuctionAssignment = async () => {
+    if (!isAdmin || !roomData.currentAuction || roomData.currentAuction.status !== 'pending') return;
+    try {
+      let assignmentMsg = "";
+      const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(roomDocRef);
+        if (!snap.exists()) return;
+        const currentData = snap.data();
+        
+        if (!currentData.currentAuction || currentData.currentAuction.status !== 'pending') return;
 
         const winnerId = currentData.currentAuction.highBidderId;
         const finalPrice = currentData.currentAuction.currentBid;
@@ -309,19 +356,27 @@ export default function App() {
 
         const nextCallerIdx = getNextCallerIndex(currentData.activeCallerIndex, updatedParts, currentData);
 
+        const newHistoryLog = {
+          playerName: player.name,
+          playerRole: player.role,
+          playerTeam: player.team,
+          winnerName: currentData.currentAuction.highBidderName,
+          price: finalPrice,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
         transaction.update(roomDocRef, {
           participants: updatedParts,
           boughtPlayers: [...(currentData.boughtPlayers || []), player.id],
+          completedAuctions: [newHistoryLog, ...(currentData.completedAuctions || [])].slice(0, 50),
           currentAuction: null,
           activeCallerIndex: nextCallerIdx
         });
         
-        if (soundEnabled) playBuzzerSound(); 
-        showNotice(`🔥 ASSEGNATO! ${player.name} a ${currentData.currentAuction.highBidderName} per ${finalPrice} cr!`);
+        assignmentMsg = `🔥 ASSEGNATO! ${player.name} a ${currentData.currentAuction.highBidderName} per ${finalPrice} cr!`;
       });
-    } catch (err) {
-      // Ignore contention failures
-    }
+      if (assignmentMsg) showNotice(assignmentMsg);
+    } catch (err) {}
   };
 
   /* STREAMING_CHUNK:Defining Phase Validation & Restrictions... */
@@ -359,15 +414,13 @@ export default function App() {
   const canParticipantBid = (participant, currentPhaseId) => {
     if (!participant) return false;
     
-    // In asta libera verifichiamo solo se ha spazio totale
     if (currentPhaseId === 'riserve_libere') {
       return participant.roster.length < TOTAL_ROSTER_SIZE;
     }
     
-    // Nelle altre fasi verifichiamo il limite 'starters' per il ruolo attivo
     const phaseConfig = PHASES.find(p => p.id === currentPhaseId);
     if (!phaseConfig) return false;
-    const activeRole = phaseConfig.allowedRoles[0]; // G, F o C
+    const activeRole = phaseConfig.allowedRoles[0];
     return hasSpecificSlotForPlayer(participant, activeRole, currentPhaseId);
   };
 
@@ -381,7 +434,7 @@ export default function App() {
     return Math.max(0, participant.credits - futureSlots);
   };
 
-  /* STREAMING_CHUNK:Safe Room Join Logic with Smart Reconnection... */
+  /* STREAMING_CHUNK:Safe Room Join Logic... */
   const handleJoinOrCreate = async (asAdmin = false) => {
     const cleanRoom = roomCode.trim().toUpperCase();
     const tName = teamName.trim();
@@ -428,7 +481,8 @@ export default function App() {
               turnDirection: 'clockwise',
               currentAuction: null,
               participants: [{ ...newParticipant, isAdmin: true }],
-              boughtPlayers: []
+              boughtPlayers: [],
+              completedAuctions: []
             };
             transaction.set(roomDocRef, serverData);
             return { joinedAsAdmin: true };
@@ -440,14 +494,11 @@ export default function App() {
             const serverData = roomSnap.data();
             const list = serverData.participants || [];
             
-            // Check if team name already exists to re-attach session
             const existingIdx = list.findIndex(p => p.teamName.toLowerCase() === tName.toLowerCase());
             
             if (existingIdx >= 0) {
-              // Re-attach utente: Aggiorniamo l'ID al nuovo ID sessione
               list[existingIdx] = { ...list[existingIdx], id: currentUserId, name: mName };
             } else {
-              // Nuovo partecipante: controlliamo capacità stanza
               if (list.length >= (serverData.maxUsers || 8)) {
                 throw new Error(`Stanza piena! È stato raggiunto il limite massimo di ${serverData.maxUsers || 8} franchigie.`);
               }
@@ -514,6 +565,7 @@ export default function App() {
       currentBid: startPrice,
       highBidderId: currentParticipant.id,
       highBidderName: currentParticipant.teamName,
+      status: 'active',
       endsAt: localEndsAt,
       pausedTimeLeft: timerDuration,
       serverExpirationThreshold: serverExpirationThreshold,
@@ -542,6 +594,11 @@ export default function App() {
     const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
     if (!currentParticipant || !roomData.currentAuction) return;
 
+    if (roomData.currentAuction.status === 'pending') {
+      showNotice("L'asta è terminata ed è in attesa di conferma dall'admin.");
+      return;
+    }
+
     if (!hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role, roomData.phase)) {
       showNotice(`Hai già completato tutti gli slot disponibili per questo ruolo.`);
       return;
@@ -560,7 +617,9 @@ export default function App() {
         if (!snap.exists()) return;
         const currentData = snap.data();
         
-        if (!currentData.currentAuction) throw new Error("Asta già chiusa!");
+        if (!currentData.currentAuction || currentData.currentAuction.status === 'pending') {
+           throw new Error("L'asta è già conclusa ed in attesa di approvazione!");
+        }
 
         if (!currentData.isTimerPaused && getNow() > currentData.currentAuction.serverExpirationThreshold) {
            throw new Error("L'asta è terminata.");
@@ -618,7 +677,7 @@ export default function App() {
         const snap = await transaction.get(roomDocRef);
         if(!snap.exists()) return;
         const currentData = snap.data();
-        if(!currentData.currentAuction) return;
+        if(!currentData.currentAuction || currentData.currentAuction.status === 'pending') return;
 
         const nextPaused = !currentData.isTimerPaused;
         let nextEndsAt = currentData.currentAuction.endsAt;
@@ -644,7 +703,7 @@ export default function App() {
   };
 
   const resetTimerSeconds = async (secs = 20) => {
-    if (!isAdmin || !roomData.currentAuction) return;
+    if (!isAdmin || !roomData.currentAuction || roomData.currentAuction.status === 'pending') return;
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
       await setDoc(roomDocRef, { 
@@ -660,7 +719,7 @@ export default function App() {
   };
 
   const undoLastBid = async () => {
-    if (!isAdmin || !roomData.currentAuction || !roomData.currentAuction.bidHistory?.length) return;
+    if (!isAdmin || !roomData.currentAuction || roomData.currentAuction.status === 'pending' || !roomData.currentAuction.bidHistory?.length) return;
     const history = [...roomData.currentAuction.bidHistory];
     
     if (history.length <= 1) {
@@ -695,7 +754,7 @@ export default function App() {
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
       await setDoc(roomDocRef, { currentAuction: null, isTimerPaused: false }, { merge: true });
-      showNotice("Asta annullata dall'amministratore.");
+      showNotice("Asta annullata.");
     } catch(e){}
   };
 
@@ -1056,6 +1115,7 @@ export default function App() {
                   <div className="absolute top-0 left-0 right-0 h-2 bg-slate-800">
                     <div 
                       className={`h-full transition-all duration-300 ${
+                        roomData.currentAuction.status === 'pending' ? 'bg-emerald-500' :
                         timeLeft <= 5 ? 'bg-red-500 animate-pulse' : timeLeft <= 10 ? 'bg-amber-500' : 'bg-emerald-500'
                       }`}
                       style={{ width: `${Math.min(100, (timeLeft / (roomData.timerSeconds || 20)) * 100)}%` }}
@@ -1082,18 +1142,20 @@ export default function App() {
 
                     {/* Live Digital Countdown Clock */}
                     <div className={`flex flex-col items-center px-4 py-2 rounded-2xl border ${
-                      roomData.isTimerPaused 
+                      roomData.currentAuction.status === 'pending'
+                        ? 'bg-emerald-950/60 border-emerald-500 text-emerald-400' 
+                        : roomData.isTimerPaused 
                         ? 'bg-amber-950/40 border-amber-500/40 text-amber-400' 
                         : timeLeft <= 5 
                         ? 'bg-red-950/60 border-red-500 text-red-400 animate-bounce' 
                         : 'bg-slate-950 border-slate-800 text-white'
                     }`}>
                       <div className="flex items-center space-x-1.5 font-mono text-3xl font-black">
-                        <Clock className="w-5 h-5 text-amber-400" />
-                        <span>{timeLeft}s</span>
+                        <Clock className="w-5 h-5" />
+                        <span>{roomData.currentAuction.status === 'pending' ? '0' : timeLeft}s</span>
                       </div>
                       <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-                        {roomData.isTimerPaused ? 'TIMER SOSPESO' : 'SCADENZA ASTA'}
+                        {roomData.currentAuction.status === 'pending' ? 'IN ATTESA' : roomData.isTimerPaused ? 'TIMER SOSPESO' : 'SCADENZA ASTA'}
                       </span>
                     </div>
                   </div>
@@ -1122,8 +1184,27 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* BIDDING CONTROLS */}
-                  {(() => {
+                  {/* BIDDING CONTROLS OR ADMIN CONFIRMATION */}
+                  {roomData.currentAuction.status === 'pending' ? (
+                     <div className="p-6 bg-emerald-950/40 border border-emerald-500/50 rounded-2xl text-center space-y-4">
+                       <h3 className="text-2xl font-black text-emerald-400">Asta Terminata!</h3>
+                       <div className="text-sm text-slate-300 bg-slate-950 p-4 rounded-xl inline-block text-left border border-slate-800">
+                         <p className="mb-1"><span className="text-slate-500">Giocatore:</span> <strong className="text-white">{roomData.currentAuction.player.name}</strong> ({roomData.currentAuction.player.role} - {roomData.currentAuction.player.team})</p>
+                         <p className="mb-1"><span className="text-slate-500">Acquirente:</span> <strong className="text-white">{roomData.currentAuction.highBidderName}</strong></p>
+                         <p><span className="text-slate-500">Prezzo Finale:</span> <strong className="text-amber-400 font-mono text-lg">{roomData.currentAuction.currentBid} cr</strong></p>
+                       </div>
+                       {isAdmin ? (
+                         <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4">
+                           <button onClick={forceCancelAuction} className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition">Annulla Asta</button>
+                           <button onClick={confirmAuctionAssignment} className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl font-black shadow-lg shadow-emerald-500/20 active:scale-95 transition">Conferma Assegnazione</button>
+                         </div>
+                       ) : (
+                         <p className="text-amber-400 font-bold mt-4 animate-pulse flex justify-center items-center gap-2">
+                           <Clock className="w-4 h-4" /> In attesa di approvazione dall'admin...
+                         </p>
+                       )}
+                     </div>
+                  ) : (() => {
                     const hasSlot = hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role, roomData.phase);
                     const hasTeamSlot = hasTeamSlotForPlayer(currentParticipant, roomData.currentAuction.player.team);
                     const maxAllowed = currentParticipant ? getMaxBidAllowed(currentParticipant) : 0;
@@ -1213,6 +1294,13 @@ export default function App() {
                         {isAdmin && (
                           <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center gap-2 text-xs">
                             <span className="text-slate-400 font-semibold">Azioni Rapide Admin:</span>
+                            <button
+                              onClick={forceEndAuction}
+                              className="px-3 py-1.5 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-400 font-bold rounded-lg border border-emerald-800 flex items-center space-x-1"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              <span>Chiudi Asta Ora</span>
+                            </button>
                             <button
                               onClick={toggleTimerPause}
                               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-lg border border-slate-700 flex items-center space-x-1"
@@ -1393,6 +1481,35 @@ export default function App() {
                     ))
                   ) : (
                     <p className="text-slate-500 text-xs text-center py-4">In attesa del prossimo giocatore e dei rilanci...</p>
+                  )}
+                </div>
+              </div>
+
+              {/* COMPLETED AUCTIONS HISTORY */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-base text-white flex items-center space-x-2">
+                    <Award className="w-5 h-5 text-emerald-400" />
+                    <span>Ultime Assegnazioni Effettuate</span>
+                  </h3>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                  {roomData.completedAuctions?.length > 0 ? (
+                    roomData.completedAuctions.map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-xl flex items-center justify-between text-xs bg-slate-950/60 border border-slate-800/60">
+                        <div className="flex items-center space-x-3">
+                          <span className="font-mono text-slate-500">{item.time}</span>
+                          <div>
+                            <span className="text-white font-bold">{item.playerName}</span>
+                            <span className="text-slate-400 ml-1">({item.playerRole} - {item.playerTeam})</span>
+                            <span className="block text-[10px] text-emerald-400 font-semibold uppercase mt-0.5">Assegnato a {item.winnerName}</span>
+                          </div>
+                        </div>
+                        <span className="font-mono text-base font-black text-amber-400">{item.price} cr</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-slate-500 text-xs text-center py-4">Ancora nessuna assegnazione registrata.</p>
                   )}
                 </div>
               </div>
