@@ -288,7 +288,8 @@ export default function App() {
         
         if (!currentData.currentAuction || currentData.currentAuction.status === 'pending') return;
 
-        if (!currentData.isTimerPaused && getNow() < currentData.currentAuction.serverExpirationThreshold) {
+        // FIX: Usiamo endsAt (scadenza esatta) e non il threshold della latenza (che aggiungeva 1.5s bloccando il timer)
+        if (!currentData.isTimerPaused && getNow() < currentData.currentAuction.endsAt) {
             return;
         }
 
