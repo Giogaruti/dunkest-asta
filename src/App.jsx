@@ -3,7 +3,7 @@ import {
   Trophy, Users, Play, Pause, RotateCcw, Clock,
   Search, ShieldAlert, Award, AlertCircle,
   Volume2, VolumeX, QrCode, Download, Settings,
-  LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2, Ban, CheckCircle
+  LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2, Ban, CheckCircle, Menu, X
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
@@ -288,7 +288,6 @@ export default function App() {
         
         if (!currentData.currentAuction || currentData.currentAuction.status === 'pending') return;
 
-        // FIX: Usiamo endsAt (scadenza esatta) e non il threshold della latenza (che aggiungeva 1.5s bloccando il timer)
         if (!currentData.isTimerPaused && getNow() < currentData.currentAuction.endsAt) {
             return;
         }
@@ -374,7 +373,7 @@ export default function App() {
           activeCallerIndex: nextCallerIdx
         });
         
-        assignmentMsg = `🔥 ASSEGNATO! ${player.name} a ${currentData.currentAuction.highBidderName} per ${finalPrice} cr!`;
+        assignmentMsg = `ASSEGNATO! ${player.name} a ${currentData.currentAuction.highBidderName} per ${finalPrice} cr!`;
       });
       if (assignmentMsg) showNotice(assignmentMsg);
     } catch (err) {}
@@ -865,104 +864,102 @@ export default function App() {
     });
   }, [playersDB, roomData.boughtPlayers, currentPhaseConfig, searchTerm]);
 
+  // LOGIN SCREEN
   if (!hasJoined) {
     const isFromQRCode = window.location.search.includes('room=');
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-600/10 via-purple-900/10 to-transparent pointer-events-none" />
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-md">
-          <div className="flex items-center justify-center space-x-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <Trophy className="w-7 h-7 text-white" />
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-center items-center p-6 relative overflow-hidden font-sans">
+        {/* Abstract subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="w-full max-w-md bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-3xl p-8 relative z-10 shadow-2xl">
+          <div className="flex flex-col items-center justify-center space-y-4 mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Trophy className="w-8 h-8 text-zinc-950" />
             </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-white uppercase">Dunkest Auction</h1>
-              <p className="text-xs text-amber-400 font-semibold tracking-widest uppercase">Live Fantasy NBA Draft</p>
+            <div className="text-center">
+              <h1 className="text-3xl font-black tracking-tight text-white uppercase">Dunkest Auction</h1>
+              <p className="text-xs text-amber-500 font-semibold tracking-widest uppercase mt-1">Live Fantasy Draft</p>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <label className="text-xs font-semibold uppercase text-slate-400 block mb-1">Codice Stanza Asta</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2 ml-1">Codice Stanza</label>
               <input
                 type="text"
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                 placeholder="es. DUNKEST25"
                 disabled={isFromQRCode}
-                className={`w-full px-4 py-3 border rounded-xl font-mono font-bold tracking-widest focus:outline-none transition ${
-                   isFromQRCode ? 'bg-slate-900 border-slate-800 text-amber-600 cursor-not-allowed' : 'bg-slate-950 border-slate-700 text-amber-400 focus:border-amber-500'
+                className={`w-full px-4 py-3.5 rounded-xl font-mono text-sm font-bold tracking-widest focus:outline-none transition-all ${
+                   isFromQRCode 
+                    ? 'bg-zinc-800/50 border border-transparent text-amber-500/50 cursor-not-allowed' 
+                    : 'bg-zinc-950 border border-white/10 text-amber-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
                 }`}
               />
             </div>
-            <div>
-              <label className="text-xs font-semibold uppercase text-slate-400 block mb-1">Nome Manager</label>
-              <input
-                type="text"
-                value={managerName}
-                onChange={(e) => setManagerName(e.target.value)}
-                placeholder="es. Gianluca"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium focus:outline-none focus:border-amber-500 transition"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2 ml-1">Tuo Nome</label>
+                <input
+                  type="text"
+                  value={managerName}
+                  onChange={(e) => setManagerName(e.target.value)}
+                  placeholder="es. Gianluca"
+                  className="w-full px-4 py-3.5 bg-zinc-950 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2 ml-1">Nome Squadra</label>
+                <input
+                  type="text"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="es. Boston Clowns"
+                  className="w-full px-4 py-3.5 bg-zinc-950 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-semibold uppercase text-slate-400 block mb-1">Nome Squadra Dunkest</label>
-              <input
-                type="text"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                placeholder="es. Boston Clowns"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium focus:outline-none focus:border-amber-500 transition"
-              />
-            </div>
+            
             {!isFromQRCode && (
               <div>
-                <label className="text-xs font-semibold uppercase text-slate-400 block mb-1">Max Squadre (Solo Creazione Host)</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2 ml-1">Max Squadre (Solo Host)</label>
                 <input
                   type="number"
                   min="2"
                   max="20"
                   value={maxUsers}
                   onChange={(e) => setMaxUsers(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium focus:outline-none focus:border-amber-500 transition"
+                  className="w-full px-4 py-3.5 bg-zinc-950 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
                 />
               </div>
             )}
 
-            <div className={`pt-2 grid gap-3 ${isFromQRCode ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            <div className={`pt-4 grid gap-3 ${isFromQRCode ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <button
                 onClick={() => handleJoinOrCreate(false)}
-                className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold rounded-xl flex items-center justify-center space-x-2 border border-slate-700 transition shadow-md"
+                className="w-full py-4 px-4 bg-white hover:bg-zinc-200 text-zinc-950 font-bold rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-[0.98]"
               >
-                <Users className="w-4 h-4 text-emerald-400" />
+                <Users className="w-4 h-4" />
                 <span>Entra (Manager)</span>
               </button>
               {!isFromQRCode && (
                 <button
                   onClick={() => handleJoinOrCreate(true)}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 text-slate-950 font-black rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-orange-500/25 transition"
+                  className="w-full py-4 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl flex items-center justify-center space-x-2 transition-all border border-white/5 active:scale-[0.98]"
                 >
-                  <ShieldAlert className="w-4 h-4 text-slate-950" />
+                  <ShieldAlert className="w-4 h-4 text-amber-500" />
                   <span>Crea Host / Admin</span>
                 </button>
               )}
             </div>
             
             {isPlayersLoading && (
-                <div className="text-center text-xs text-amber-500 animate-pulse font-bold mt-2">
-                    Caricamento giocatori in corso...
+                <div className="text-center text-xs text-amber-500 animate-pulse font-medium mt-4">
+                    Caricamento database giocatori...
                 </div>
             )}
-
-            <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-400 space-y-1">
-              <div className="flex items-center text-amber-400 font-semibold mb-1">
-                <Info className="w-3.5 h-3.5 mr-1" />
-                <span>Regole Squadra Dunkest:</span>
-              </div>
-              <p>• {TOTAL_ROSTER_SIZE} membri totali (5 Guardie, 5 Ali, 3 Centri).</p>
-              <p>• Max 2 giocatori della stessa squadra NBA.</p>
-              <p>• Offerte sincronizzate in tempo reale con timer 20s.</p>
-            </div>
           </div>
         </div>
       </div>
@@ -971,663 +968,580 @@ export default function App() {
 
   /* STREAMING_CHUNK:Rendering the main app workspace... */
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="h-screen w-full bg-zinc-950 text-zinc-200 flex flex-col overflow-hidden font-sans selection:bg-amber-500/30">
+      
+      {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold px-6 py-3 rounded-full shadow-2xl flex items-center space-x-2 animate-bounce">
-          <Flame className="w-5 h-5 text-slate-950" />
-          <span>{notification}</span>
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-zinc-800 border border-white/10 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 animate-in slide-in-from-top-4 fade-in duration-300">
+          <Flame className="w-5 h-5 text-amber-500" />
+          <span className="font-semibold text-sm">{notification}</span>
         </div>
       )}
 
-      {/* Top Bar */}
-      <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-md">
-            <Trophy className="w-6 h-6 text-slate-950" />
+      {/* TOP DESKTOP HEADER & MOBILE TOP BAR */}
+      <header className="h-16 md:h-20 shrink-0 border-b border-white/5 bg-zinc-900/50 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30">
+        <div className="flex items-center space-x-4">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/10 shrink-0">
+            <Trophy className="w-5 h-5 md:w-6 md:h-6 text-zinc-950" />
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-black text-lg text-white tracking-wide">DUNKEST AUCTION</span>
-              <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full font-mono font-semibold border border-amber-500/30">
-                STANZA: {roomData.code}
+          <div className="flex flex-col">
+            <div className="flex items-center space-x-3">
+              <span className="font-black text-lg md:text-xl text-white tracking-tight hidden sm:block">DUNKEST AUCTION</span>
+              <span className="font-black text-lg text-white tracking-tight sm:hidden">DUNKEST</span>
+              <span className="bg-white/10 text-zinc-300 text-[10px] md:text-xs px-2 py-0.5 rounded font-mono font-medium border border-white/10">
+                {roomData.code}
               </span>
               {isAdmin && (
-                <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full font-semibold border border-red-500/30">
+                <span className="bg-red-500/10 text-red-400 text-[10px] md:text-xs px-2 py-0.5 rounded font-bold border border-red-500/20">
                   ADMIN
                 </span>
               )}
             </div>
-            <div className="text-xs text-slate-400 flex items-center space-x-2">
-              <span>Franchigia: <strong className="text-slate-200">{currentParticipant?.teamName}</strong></span>
-              <span>•</span>
-              <span className="text-emerald-400 font-bold">{currentParticipant?.credits} Crediti</span>
-              <span>•</span>
-              <span>Slot: {currentParticipant?.roster.length || 0}/{TOTAL_ROSTER_SIZE}</span>
+            <div className="text-xs text-zinc-400 flex items-center space-x-2 mt-0.5">
+              <span className="truncate max-w-[120px] md:max-w-[200px] font-medium text-zinc-200">{currentParticipant?.teamName}</span>
+              <span className="opacity-50">•</span>
+              <span className="text-amber-500 font-semibold">{currentParticipant?.credits} cr</span>
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto custom-scrollbar">
-          <button
-            onClick={() => setActiveTab('auction')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
-              activeTab === 'auction' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Asta Live</span>
+        {/* Desktop Tabs Navigation */}
+        <div className="hidden md:flex items-center bg-zinc-950/50 p-1 rounded-xl border border-white/5 mx-4">
+          <button onClick={() => setActiveTab('auction')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-2 ${activeTab === 'auction' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
+            <Flame className="w-4 h-4" />
+            <span>Asta Live</span>
           </button>
-          <button
-            onClick={() => setActiveTab('rosters')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
-              activeTab === 'rosters' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Rose ({roomData.participants.length}/{roomData.maxUsers})</span>
+          <button onClick={() => setActiveTab('rosters')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-2 ${activeTab === 'rosters' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
+            <Users className="w-4 h-4" />
+            <span>Rose ({roomData.participants.length}/{roomData.maxUsers})</span>
           </button>
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
-              activeTab === 'stats' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Statistiche</span>
+          <button onClick={() => setActiveTab('stats')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-2 ${activeTab === 'stats' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
+            <BarChart3 className="w-4 h-4" />
+            <span>Statistiche</span>
           </button>
           {isAdmin && (
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
-                activeTab === 'admin' ? 'bg-red-500 text-white shadow' : 'text-red-400 hover:text-white'
-              }`}
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Host</span>
+            <button onClick={() => setActiveTab('admin')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-2 ${activeTab === 'admin' ? 'bg-zinc-800 text-red-400 shadow-sm' : 'text-zinc-500 hover:text-red-400/70'}`}>
+              <Settings className="w-4 h-4" />
+              <span>Host Settings</span>
             </button>
           )}
         </div>
 
-        {/* Header Tools */}
+        {/* Global Header Actions */}
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-            title={soundEnabled ? "Disattiva suoni" : "Attiva suoni"}
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+          <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 rounded-xl hover:bg-white/5 text-zinc-400 transition" title={soundEnabled ? "Disattiva suoni" : "Attiva suoni"}>
+            {soundEnabled ? <Volume2 className="w-5 h-5 text-amber-500" /> : <VolumeX className="w-5 h-5" />}
           </button>
-          <button
-            onClick={() => setShowQRModal(true)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-300 flex items-center space-x-1.5 transition border border-slate-700"
-          >
-            <QrCode className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">Invita con QR</span>
+          <button onClick={() => setShowQRModal(true)} className="hidden md:flex px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-semibold text-zinc-300 items-center space-x-2 transition border border-white/5">
+            <QrCode className="w-4 h-4 text-amber-500" />
+            <span>Invita</span>
           </button>
-          <button
-            onClick={handleLeaveRoom}
-            className="p-2 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-800/50 text-red-400 transition-colors flex items-center justify-center"
-            title="Esci dalla Stanza"
-          >
-            <LogOut className="w-4 h-4" />
+          <button onClick={handleLeaveRoom} className="p-2 rounded-xl hover:bg-red-500/10 text-red-400 transition flex items-center justify-center" title="Esci">
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </header>
 
-      <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs">
+      {/* PHASE & TURN BANNER (Always visible top bar) */}
+      <div className="h-10 md:h-12 bg-zinc-900/30 border-b border-white/5 flex items-center justify-between px-4 md:px-8 shrink-0 text-[11px] md:text-xs z-20">
         <div className="flex items-center space-x-3">
-          <span className="text-slate-400 uppercase tracking-wider font-semibold">Fase Attuale:</span>
-          <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 py-1 rounded-full font-bold">
+          <span className="text-zinc-500 font-semibold hidden sm:inline">FASE:</span>
+          <span className="text-zinc-200 font-bold px-2 py-0.5 rounded bg-zinc-800 border border-white/5">
             {currentPhaseConfig.name}
           </span>
-          <span className="text-slate-500 hidden sm:inline">|</span>
-          <span className="text-slate-400 hidden sm:inline">Rotazione:</span>
-          <span className="text-slate-200 font-medium capitalize hidden sm:inline">
-            {roomData.turnDirection === 'clockwise' ? 'Orario ↻' : 'Antiorario ↺'}
-          </span>
+          <span className="text-zinc-600 hidden md:inline">|</span>
+          <span className="text-zinc-500 hidden md:inline">GIRO: <span className="text-zinc-300">{roomData.turnDirection === 'clockwise' ? 'Orario ↻' : 'Antiorario ↺'}</span></span>
         </div>
         
-        {/* Caller Turn Indicator */}
-        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-          <span className="text-slate-400">Tocca chiamare a:</span>
-          <div className={`px-3 py-1 rounded-full font-bold flex items-center space-x-1.5 ${
+        <div className="flex items-center space-x-2">
+          <span className="text-zinc-500 hidden sm:inline">CHIAMATA A:</span>
+          <div className={`px-2 py-1 rounded-md font-bold flex items-center space-x-2 transition-colors ${
             isMyCallingTurn 
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse' 
-              : 'bg-slate-800 text-slate-200'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse' 
+              : 'bg-zinc-800 text-zinc-300 border border-white/5'
           }`}>
             <UserCheck className="w-3.5 h-3.5" />
             <span>{activeCaller?.teamName || 'In attesa'}</span>
-            {isMyCallingTurn && <span className="text-[10px] uppercase font-black tracking-wider ml-1 bg-emerald-500 text-slate-950 px-1.5 rounded">Tocca a te!</span>}
+            {isMyCallingTurn && <span className="text-[9px] uppercase font-black bg-emerald-500 text-zinc-950 px-1 rounded ml-1 hidden sm:inline">Tocca a te</span>}
           </div>
         </div>
       </div>
 
-      <main className="flex-1 p-4 max-w-7xl w-full mx-auto">
-        {activeTab === 'auction' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* MAIN CONTENT AREA - True Full Screen & Scrollable columns */}
+      <main className="flex-1 flex overflow-hidden relative pb-16 md:pb-0"> 
+        <div className="h-full w-full mx-auto max-w-[1800px] p-4 md:p-6 flex flex-col md:flex-row gap-6">
+          
+          {/* LEFT/MAIN COLUMN (Auction) */}
+          <div className={`flex-1 flex-col gap-6 md:overflow-y-auto custom-scrollbar md:pr-4 ${activeTab === 'auction' ? 'flex' : 'hidden md:flex'}`}>
             
-            {/* Left Column: Live Bidding Arena */}
-            <div className="lg:col-span-8 space-y-6">
-              {/* CURRENT PLAYER IN AUCTION BOX */}
-              {roomData.currentAuction ? (
-                <div className="bg-slate-900 border-2 border-amber-500/50 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                  {/* Timer Bar */}
-                  <div className="absolute top-0 left-0 right-0 h-2 bg-slate-800">
-                    <div 
-                      className={`h-full transition-all duration-300 ${
-                        roomData.currentAuction.status === 'pending' ? 'bg-emerald-500' :
-                        timeLeft <= 5 ? 'bg-red-500 animate-pulse' : timeLeft <= 10 ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`}
-                      style={{ width: `${Math.min(100, (timeLeft / (roomData.timerSeconds || 20)) * 100)}%` }}
+            {/* AUCTION WIDGET */}
+            {roomData.currentAuction ? (
+              <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 md:p-8 shadow-xl relative overflow-hidden flex flex-col shrink-0">
+                {/* Timer Bar Top */}
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-zinc-950">
+                  <div 
+                    className={`h-full transition-all duration-200 ease-linear ${
+                      roomData.currentAuction.status === 'pending' ? 'bg-emerald-500' :
+                      timeLeft <= 5 ? 'bg-red-500' : timeLeft <= 10 ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (timeLeft / (roomData.timerSeconds || 20)) * 100)}%` }}
+                  />
+                </div>
+
+                <div className="flex flex-row justify-between items-start mb-6 md:mb-8">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider border ${
+                        roomData.currentAuction.player.role === 'G' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                        roomData.currentAuction.player.role === 'F' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
+                        'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                      }`}>
+                        {roomData.currentAuction.player.role === 'G' ? 'Guardia (G)' : 
+                         roomData.currentAuction.player.role === 'F' ? 'Ala (F)' : 'Centro (C)'}
+                      </span>
+                      <span className="text-zinc-400 font-mono text-xs font-semibold px-2 py-0.5 bg-zinc-950 rounded border border-white/5">{roomData.currentAuction.player.team}</span>
+                      <span className="text-amber-500 text-[10px] md:text-xs font-semibold ml-2">Quotazione: {roomData.currentAuction.player.basePrice} cr</span>
+                    </div>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none">
+                      {roomData.currentAuction.player.name}
+                    </h2>
+                  </div>
+
+                  {/* Timer Display */}
+                  <div className={`flex flex-col items-center justify-center p-3 md:p-4 rounded-2xl border min-w-[80px] md:min-w-[100px] shrink-0 ml-4 ${
+                    roomData.currentAuction.status === 'pending'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                      : roomData.isTimerPaused 
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' 
+                      : timeLeft <= 5 
+                      ? 'bg-red-500/10 border-red-500/30 text-red-500 animate-pulse' 
+                      : 'bg-zinc-950 border-white/10 text-white'
+                  }`}>
+                    <span className="font-mono text-3xl md:text-4xl font-black leading-none">{roomData.currentAuction.status === 'pending' ? '0' : timeLeft}</span>
+                    <span className="text-[9px] md:text-[10px] uppercase font-bold tracking-widest mt-1 opacity-70">
+                      {roomData.currentAuction.status === 'pending' ? 'ATTESA' : roomData.isTimerPaused ? 'PAUSA' : 'SEC'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                   <div className="bg-zinc-950 border border-white/5 rounded-2xl p-4 md:p-5 flex flex-col justify-center">
+                     <p className="text-[10px] md:text-xs uppercase text-zinc-500 font-semibold tracking-wider mb-1">Miglior Offerta</p>
+                     <div className="flex items-baseline space-x-2">
+                       <span className="text-4xl md:text-5xl font-black text-amber-500 tracking-tighter">
+                         {roomData.currentAuction.currentBid}
+                       </span>
+                       <span className="text-sm font-medium text-zinc-400">cr</span>
+                     </div>
+                   </div>
+                   <div className="bg-zinc-950 border border-white/5 rounded-2xl p-4 md:p-5 flex flex-col justify-center">
+                     <p className="text-[10px] md:text-xs uppercase text-zinc-500 font-semibold tracking-wider mb-1">In Vantaggio</p>
+                     <p className="text-xl md:text-2xl font-bold text-white truncate">
+                       {roomData.currentAuction.highBidderName}
+                     </p>
+                     {roomData.currentAuction.highBidderId === currentParticipant?.id && (
+                       <span className="inline-block mt-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30 w-max">
+                         SEI TU IL LEADER
+                       </span>
+                     )}
+                   </div>
+                </div>
+
+                {/* BIDDING CONTROLS OR ADMIN CONFIRMATION */}
+                {roomData.currentAuction.status === 'pending' ? (
+                   <div className="mt-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 md:p-6 text-center space-y-4">
+                     <h3 className="text-xl font-black text-emerald-400">Asta Terminata!</h3>
+                     {isAdmin ? (
+                       <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4">
+                         <button onClick={forceCancelAuction} className="px-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-bold transition text-sm">Annulla Asta</button>
+                         <button onClick={confirmAuctionAssignment} className="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-xl font-black shadow-lg active:scale-95 transition text-sm">Conferma Assegnazione</button>
+                       </div>
+                     ) : (
+                       <p className="text-emerald-400/70 font-semibold text-sm animate-pulse flex justify-center items-center gap-2">
+                         <Clock className="w-4 h-4" /> In attesa di registrazione da parte dell'Host...
+                       </p>
+                     )}
+                   </div>
+                ) : (() => {
+                  const hasSlot = hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role, roomData.phase);
+                  const hasTeamSlot = hasTeamSlotForPlayer(currentParticipant, roomData.currentAuction.player.team);
+                  const maxAllowed = currentParticipant ? getMaxBidAllowed(currentParticipant) : 0;
+
+                  return (
+                    // Sticky container for mobile to keep buttons always reachable
+                    <div className="sticky bottom-16 md:relative md:bottom-auto bg-zinc-900 md:bg-transparent -mx-5 px-5 pb-5 md:mx-0 md:px-0 md:pb-0 z-30 pt-4 md:pt-0 border-t border-white/5 md:border-0">
+                      {!hasSlot ? (
+                        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start space-x-3 text-red-400 text-sm">
+                          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                          <span><strong>Spettatore:</strong> Hai completato gli slot per il ruolo {roomData.currentAuction.player.role} in questa fase.</span>
+                        </div>
+                      ) : !hasTeamSlot ? (
+                         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start space-x-3 text-red-400 text-sm">
+                           <Ban className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                           <span><strong>Limite Franchigia:</strong> Hai già 2 giocatori per i <strong>{roomData.currentAuction.player.team}</strong>.</span>
+                         </div>
+                      ) : maxAllowed <= roomData.currentAuction.currentBid ? (
+                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start space-x-3 text-amber-500 text-sm">
+                          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                          <span><strong>Crediti insufficienti:</strong> Offerta massima consentita {maxAllowed} cr.</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-end mb-1">
+                             <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Rilancio Rapido</span>
+                             <span className="text-[11px] text-zinc-500">Max Bid: <strong className="text-amber-500">{maxAllowed} cr</strong></span>
+                          </div>
+                          
+                          <div className="grid grid-cols-4 gap-2">
+                            <button onClick={() => handlePlaceBid(1)} className="py-3.5 md:py-4 bg-white hover:bg-zinc-200 text-zinc-950 font-black rounded-xl text-sm shadow-md active:scale-95 transition">
+                              +1 <span className="font-medium text-xs opacity-60 ml-1 block sm:inline">({roomData.currentAuction.currentBid + 1})</span>
+                            </button>
+                            <button onClick={() => handlePlaceBid(2)} className="py-3.5 md:py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-sm border border-white/5 active:scale-95 transition">
+                              +2 <span className="font-medium text-xs text-zinc-400 ml-1 block sm:inline">({roomData.currentAuction.currentBid + 2})</span>
+                            </button>
+                            <button onClick={() => handlePlaceBid(5)} className="py-3.5 md:py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-sm border border-white/5 active:scale-95 transition">
+                              +5 <span className="font-medium text-xs text-zinc-400 ml-1 block sm:inline">({roomData.currentAuction.currentBid + 5})</span>
+                            </button>
+                            <button onClick={() => handlePlaceBid(10)} className="py-3.5 md:py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-sm border border-white/5 active:scale-95 transition">
+                              +10 <span className="font-medium text-xs text-zinc-400 ml-1 block sm:inline">({roomData.currentAuction.currentBid + 10})</span>
+                            </button>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min={roomData.currentAuction.currentBid + 1}
+                              max={maxAllowed}
+                              value={customBidAmount}
+                              onChange={(e) => setCustomBidAmount(e.target.value)}
+                              placeholder="Offerta personalizzata..."
+                              className="flex-1 px-4 py-3 bg-zinc-950 border border-white/10 rounded-xl text-white font-bold focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm"
+                            />
+                            <button
+                              onClick={() => {
+                                if (customBidAmount) handlePlaceBid(parseInt(customBidAmount), true);
+                              }}
+                              className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold rounded-xl shadow-lg active:scale-95 transition text-sm shrink-0"
+                            >
+                              Offri
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Admin Quick Actions in Auction */}
+                      {isAdmin && (
+                        <div className="mt-4 pt-4 border-t border-white/5 flex flex-wrap items-center gap-2">
+                          <button onClick={forceEndAuction} className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20 flex items-center space-x-1">
+                            <CheckCircle className="w-3.5 h-3.5" /><span>Chiudi Subito</span>
+                          </button>
+                          <button onClick={toggleTimerPause} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold rounded-lg border border-white/5 flex items-center space-x-1">
+                            {roomData.isTimerPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                            <span>{roomData.isTimerPaused ? 'Riprendi' : 'Pausa'}</span>
+                          </button>
+                          <button onClick={() => resetTimerSeconds(20)} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold rounded-lg border border-white/5 flex items-center space-x-1">
+                            <RotateCcw className="w-3.5 h-3.5" /><span>Reset 20s</span>
+                          </button>
+                          <button onClick={undoLastBid} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-amber-500 text-xs font-bold rounded-lg border border-white/5">
+                            Annulla Rilancio
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              /* NOMINATION BLOCK */
+              <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 md:p-8 shadow-xl flex flex-col shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/5">
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-white">Chiamata Giocatore</h2>
+                    <p className="text-xs md:text-sm text-zinc-400 mt-1">
+                      {isMyCallingTurn 
+                        ? "È il tuo turno. Cerca un giocatore e apri l'asta." 
+                        : `Turno di ${activeCaller?.teamName || 'un altro manager'}.`}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 shrink-0 bg-zinc-950 p-1.5 rounded-lg border border-white/5">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase ml-1">Filtro:</span>
+                    <span className="text-xs bg-white text-zinc-950 px-2 py-0.5 rounded-md font-bold">
+                      {currentPhaseConfig.allowedRoles.join(', ')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="my-5">
+                  <div className="relative">
+                    <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Cerca nome o squadra (es. Jokic, DEN)..."
+                      className="w-full pl-12 pr-4 py-3.5 bg-zinc-950 border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
                     />
                   </div>
-
-                  <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase tracking-wider ${
-                          roomData.currentAuction.player.role === 'G' ? 'bg-blue-500 text-slate-950' :
-                          roomData.currentAuction.player.role === 'F' ? 'bg-emerald-500 text-slate-950' : 'bg-purple-500 text-white'
-                        }`}>
-                          {roomData.currentAuction.player.role === 'G' ? 'Guardia (G)' : 
-                           roomData.currentAuction.player.role === 'F' ? 'Ala (F)' : 'Centro (C)'}
-                        </span>
-                        <span className="text-slate-400 font-mono text-xs">{roomData.currentAuction.player.team}</span>
-                        <span className="text-amber-400 text-xs font-semibold">Quotaz. Dunkest: {roomData.currentAuction.player.basePrice} cr</span>
-                      </div>
-                      <h2 className="text-3xl sm:text-4xl font-black text-white mt-1">
-                        {roomData.currentAuction.player.name}
-                      </h2>
-                    </div>
-
-                    {/* Live Digital Countdown Clock */}
-                    <div className={`flex flex-col items-center px-4 py-2 rounded-2xl border ${
-                      roomData.currentAuction.status === 'pending'
-                        ? 'bg-emerald-950/60 border-emerald-500 text-emerald-400' 
-                        : roomData.isTimerPaused 
-                        ? 'bg-amber-950/40 border-amber-500/40 text-amber-400' 
-                        : timeLeft <= 5 
-                        ? 'bg-red-950/60 border-red-500 text-red-400 animate-bounce' 
-                        : 'bg-slate-950 border-slate-800 text-white'
-                    }`}>
-                      <div className="flex items-center space-x-1.5 font-mono text-3xl font-black">
-                        <Clock className="w-5 h-5" />
-                        <span>{roomData.currentAuction.status === 'pending' ? '0' : timeLeft}s</span>
-                      </div>
-                      <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-                        {roomData.currentAuction.status === 'pending' ? 'IN ATTESA' : roomData.isTimerPaused ? 'TIMER SOSPESO' : 'SCADENZA ASTA'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* High Bid Box */}
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-                    <div>
-                      <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">Miglior Offerta Attuale</p>
-                      <div className="flex items-baseline space-x-2">
-                        <span className="text-5xl font-black text-amber-400">
-                          {roomData.currentAuction.currentBid}
-                        </span>
-                        <span className="text-lg font-bold text-slate-400">Crediti</span>
-                      </div>
-                    </div>
-                    <div className="text-center sm:text-right">
-                      <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">In Vantaggio</p>
-                      <p className="text-xl font-bold text-emerald-400 flex items-center justify-center sm:justify-end space-x-2">
-                        <span>{roomData.currentAuction.highBidderName}</span>
-                        {roomData.currentAuction.highBidderId === currentParticipant?.id && (
-                          <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/40">
-                            SEI TU!
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* BIDDING CONTROLS OR ADMIN CONFIRMATION */}
-                  {roomData.currentAuction.status === 'pending' ? (
-                     <div className="p-6 bg-emerald-950/40 border border-emerald-500/50 rounded-2xl text-center space-y-4">
-                       <h3 className="text-2xl font-black text-emerald-400">Asta Terminata!</h3>
-                       <div className="text-sm text-slate-300 bg-slate-950 p-4 rounded-xl inline-block text-left border border-slate-800">
-                         <p className="mb-1"><span className="text-slate-500">Giocatore:</span> <strong className="text-white">{roomData.currentAuction.player.name}</strong> ({roomData.currentAuction.player.role} - {roomData.currentAuction.player.team})</p>
-                         <p className="mb-1"><span className="text-slate-500">Acquirente:</span> <strong className="text-white">{roomData.currentAuction.highBidderName}</strong></p>
-                         <p><span className="text-slate-500">Prezzo Finale:</span> <strong className="text-amber-400 font-mono text-lg">{roomData.currentAuction.currentBid} cr</strong></p>
-                       </div>
-                       {isAdmin ? (
-                         <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4">
-                           <button onClick={forceCancelAuction} className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition">Annulla Asta</button>
-                           <button onClick={confirmAuctionAssignment} className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl font-black shadow-lg shadow-emerald-500/20 active:scale-95 transition">Conferma Assegnazione</button>
-                         </div>
-                       ) : (
-                         <p className="text-amber-400 font-bold mt-4 animate-pulse flex justify-center items-center gap-2">
-                           <Clock className="w-4 h-4" /> In attesa di approvazione dall'admin...
-                         </p>
-                       )}
-                     </div>
-                  ) : (() => {
-                    const hasSlot = hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role, roomData.phase);
-                    const hasTeamSlot = hasTeamSlotForPlayer(currentParticipant, roomData.currentAuction.player.team);
-                    const maxAllowed = currentParticipant ? getMaxBidAllowed(currentParticipant) : 0;
-
-                    return (
-                      <div className="space-y-4">
-                        {!hasSlot ? (
-                          <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-2xl flex items-center space-x-3 text-red-300 text-sm">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400" />
-                            <span>
-                              <strong>Sei spettatore:</strong> Hai già riempito tutti gli slot per il ruolo {roomData.currentAuction.player.role} in questa fase.
-                            </span>
-                          </div>
-                        ) : !hasTeamSlot ? (
-                           <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-2xl flex items-center space-x-3 text-red-300 text-sm">
-                             <Ban className="w-5 h-5 flex-shrink-0 text-red-400" />
-                             <span>
-                               <strong>Limite Squadra NBA:</strong> Hai già 2 giocatori per i <strong>{roomData.currentAuction.player.team}</strong>. Non puoi offrire per altri.
-                             </span>
-                           </div>
-                        ) : maxAllowed <= roomData.currentAuction.currentBid ? (
-                          <div className="p-4 bg-amber-950/30 border border-amber-800/50 rounded-2xl flex items-center space-x-3 text-amber-300 text-sm">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-400" />
-                            <span>
-                              <strong>Budget insufficiente:</strong> La tua spesa massima consentita è {maxAllowed} cr per mantenere almeno 1 credito per i restanti slot da riempire.
-                            </span>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                              <span>Offerte Rapide in Sincro:</span>
-                              <span>Tuo tetto massimo: <strong className="text-amber-400">{maxAllowed} cr</strong></span>
-                            </div>
-                            {/* Quick Bid Increment Buttons */}
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-3">
-                              <button
-                                onClick={() => handlePlaceBid(1)}
-                                className="py-3 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-base shadow-lg shadow-amber-500/20 active:scale-95 transition"
-                              >
-                                +1 ({roomData.currentAuction.currentBid + 1})
-                              </button>
-                              <button
-                                onClick={() => handlePlaceBid(2)}
-                                className="py-3 px-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-base border border-slate-700 active:scale-95 transition"
-                              >
-                                +2 ({roomData.currentAuction.currentBid + 2})
-                              </button>
-                              <button
-                                onClick={() => handlePlaceBid(5)}
-                                className="py-3 px-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-base border border-slate-700 active:scale-95 transition"
-                              >
-                                +5 ({roomData.currentAuction.currentBid + 5})
-                              </button>
-                              <button
-                                onClick={() => handlePlaceBid(10)}
-                                className="py-3 px-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-base border border-slate-700 active:scale-95 transition"
-                              >
-                                +10 ({roomData.currentAuction.currentBid + 10})
-                              </button>
-                            </div>
-                            {/* Manual Custom Amount Bid Input */}
-                            <div className="flex gap-2">
-                              <input
-                                type="number"
-                                min={roomData.currentAuction.currentBid + 1}
-                                max={maxAllowed}
-                                value={customBidAmount}
-                                onChange={(e) => setCustomBidAmount(e.target.value)}
-                                placeholder={`Inserisci rilancio a mano (es. ${roomData.currentAuction.currentBid + 3})...`}
-                                className="flex-1 px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold focus:outline-none focus:border-amber-500"
-                              />
-                              <button
-                                onClick={() => {
-                                  if (customBidAmount) {
-                                    handlePlaceBid(parseInt(customBidAmount), true);
-                                  }
-                                }}
-                                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition"
-                              >
-                                Conferma Rilancio
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Admin Action Shortcuts */}
-                        {isAdmin && (
-                          <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center gap-2 text-xs">
-                            <span className="text-slate-400 font-semibold">Azioni Rapide Admin:</span>
-                            <button
-                              onClick={forceEndAuction}
-                              className="px-3 py-1.5 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-400 font-bold rounded-lg border border-emerald-800 flex items-center space-x-1"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              <span>Chiudi Asta Ora</span>
-                            </button>
-                            <button
-                              onClick={toggleTimerPause}
-                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-lg border border-slate-700 flex items-center space-x-1"
-                            >
-                              {roomData.isTimerPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                              <span>{roomData.isTimerPaused ? 'Riprendi Tempo' : 'Pausa Tempo'}</span>
-                            </button>
-                            <button
-                              onClick={() => resetTimerSeconds(20)}
-                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg border border-slate-700 flex items-center space-x-1"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>Reset 20s</span>
-                            </button>
-                            <button
-                              onClick={undoLastBid}
-                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-orange-400 font-bold rounded-lg border border-slate-700"
-                            >
-                              Annulla Ultimo Rilancio
-                            </button>
-                            <button
-                              onClick={forceCancelAuction}
-                              className="px-3 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 font-bold rounded-lg border border-red-800"
-                            >
-                              Annulla Asta
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
                 </div>
-              ) : (
-                /* NO ACTIVE AUCTION -> NOMINATION CONTROLS */
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-                    <div>
-                      <h2 className="text-2xl font-black text-white">Chiamata Giocatore</h2>
-                      <p className="text-sm text-slate-400">
-                        {isMyCallingTurn 
-                          ? "🔥 IL TUO TURNO! Seleziona un giocatore e apri l'asta con un'offerta di base." 
-                          : `Turno di ${activeCaller?.teamName || 'un altro manager'}. Puoi comunque esplorare il database.`}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-slate-400 font-semibold">Filtro Fase:</span>
-                      <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/40 px-3 py-1 rounded-full font-bold">
-                        {currentPhaseConfig.allowedRoles.join(' / ')}
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Player Search Bar */}
-                  <div className="my-4">
-                    <div className="relative">
-                      <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Cerca stella NBA per nome, squadra (es. Jokic, Doncic, Celtics)..."
-                        className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 font-medium"
-                      />
+                <div className="flex-1 max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                  {availablePlayers.length === 0 ? (
+                    <div className="text-center py-10 text-zinc-500 text-sm">
+                      Nessun giocatore disponibile con questi filtri.
                     </div>
-                  </div>
-
-                  {/* Search Results Player List */}
-                  <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                    {availablePlayers.length === 0 ? (
-                      <div className="text-center py-8 text-slate-500 text-sm">
-                        Nessun giocatore trovato o tutti i giocatori per questo ruolo sono già stati acquistati.
-                      </div>
-                    ) : (
-                      availablePlayers.map((player) => {
-                        const isSelected = selectedNominee?.id === player.id;
-                        return (
-                          <div
-                            key={player.id}
-                            onClick={() => setSelectedNominee(player)}
-                            className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
-                              isSelected 
-                                ? 'bg-amber-500/10 border-amber-500 text-white shadow-md' 
-                                : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/50 text-slate-300'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-3">
-                              <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center ${
-                                player.role === 'G' ? 'bg-blue-600/30 text-blue-400 border border-blue-500/40' :
-                                player.role === 'F' ? 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40' :
-                                'bg-purple-600/30 text-purple-400 border border-purple-500/40'
-                              }`}>
-                                {player.role}
-                              </span>
-                              <div>
-                                <p className="font-bold text-sm text-white">{player.name}</p>
-                                <p className="text-xs text-slate-400">{player.team} • {player.tier}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <div className="text-right">
-                                <span className="text-xs text-slate-400 block">Dunkest Cr</span>
-                                <span className="text-sm font-bold text-amber-400">{player.basePrice}</span>
-                              </div>
-                              <div className={`w-6 h-6 rounded-full border flex items-center justify-center ${
-                                isSelected ? 'bg-amber-500 border-amber-500 text-slate-950' : 'border-slate-700'
-                              }`}>
-                                {isSelected ? '✓' : ''}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Nomination Action Panel */}
-                  {selectedNominee && (
-                    <div className="mt-6 pt-4 border-t border-slate-800 bg-slate-950/80 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div>
-                        <span className="text-xs text-amber-400 font-semibold uppercase">Giocatore Selezionato:</span>
-                        <h4 className="text-lg font-black text-white">{selectedNominee.name} ({selectedNominee.role} - {selectedNominee.team})</h4>
-                      </div>
-                      <div className="flex items-center space-x-3 w-full sm:w-auto">
-                        <div className="flex items-center space-x-2">
-                          <label className="text-xs text-slate-400 font-semibold">Base d'asta:</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={openingBid}
-                            onChange={(e) => setOpeningBid(e.target.value)}
-                            className="w-20 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl font-bold text-amber-400 text-center focus:outline-none"
-                          />
-                        </div>
-                        <button
-                          onClick={handleStartNomination}
-                          disabled={!isMyCallingTurn && !isAdmin}
-                          className={`flex-1 sm:flex-initial py-3 px-6 rounded-xl font-black text-sm flex items-center justify-center space-x-2 transition ${
-                            isMyCallingTurn || isAdmin
-                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-lg shadow-orange-500/25 active:scale-95' 
-                              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  ) : (
+                    availablePlayers.map((player) => {
+                      const isSelected = selectedNominee?.id === player.id;
+                      return (
+                        <div
+                          key={player.id}
+                          onClick={() => setSelectedNominee(player)}
+                          className={`p-3 md:p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${
+                            isSelected 
+                              ? 'bg-amber-500/10 border-amber-500/50 text-white shadow-sm' 
+                              : 'bg-zinc-950 border-white/5 hover:bg-zinc-800 text-zinc-300'
                           }`}
                         >
-                          <Play className="w-4 h-4 fill-current" />
-                          <span>Chiama per Asta</span>
-                        </button>
-                      </div>
-                    </div>
+                          <div className="flex items-center space-x-3 md:space-x-4">
+                            <span className={`w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center border ${
+                              player.role === 'G' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                              player.role === 'F' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                              'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                            }`}>
+                              {player.role}
+                            </span>
+                            <div>
+                              <p className="font-bold text-sm text-white group-hover:text-amber-500 transition-colors">{player.name}</p>
+                              <p className="text-[11px] text-zinc-500 font-medium mt-0.5">{player.team} • {player.tier}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <div className="text-right hidden sm:block">
+                              <span className="text-[10px] text-zinc-500 block uppercase font-semibold tracking-wider">Base</span>
+                              <span className="text-sm font-bold text-amber-500">{player.basePrice} cr</span>
+                            </div>
+                            <span className="text-sm font-bold text-amber-500 sm:hidden">{player.basePrice}</span>
+                            
+                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                              isSelected ? 'bg-amber-500 border-amber-500 text-zinc-950' : 'border-zinc-700'
+                            }`}>
+                              {isSelected && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
-              )}
 
-              {/* LIVE BID HISTORY STREAM */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-base text-white flex items-center space-x-2">
-                    <Flame className="w-4 h-4 text-orange-400" />
-                    <span>Cronologia Rilanci in Tempo Reale</span>
-                  </h3>
-                </div>
-                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                {/* Call to Action Sticky Area */}
+                {selectedNominee && (
+                  <div className="mt-5 pt-4 border-t border-white/5 bg-zinc-900 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
+                    <div className="text-center md:text-left w-full md:w-auto">
+                      <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Selezionato</span>
+                      <h4 className="text-base font-bold text-white truncate max-w-[250px]">{selectedNominee.name}</h4>
+                    </div>
+                    <div className="flex items-center space-x-3 w-full md:w-auto">
+                      <div className="flex items-center space-x-2 bg-zinc-950 border border-white/10 rounded-xl px-3 py-1.5 h-[46px]">
+                        <label className="text-[11px] text-zinc-400 font-bold uppercase">Base:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={openingBid}
+                          onChange={(e) => setOpeningBid(e.target.value)}
+                          className="w-12 bg-transparent text-amber-500 font-black text-base text-center focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        onClick={handleStartNomination}
+                        disabled={!isMyCallingTurn && !isAdmin}
+                        className={`flex-1 md:flex-initial h-[46px] px-6 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all ${
+                          isMyCallingTurn || isAdmin
+                            ? 'bg-white hover:bg-zinc-200 text-zinc-950 shadow-md active:scale-95' 
+                            : 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-white/5'
+                        }`}
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        <span>Apri Asta</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LOWER CONTENT: Event History Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 shrink-0 mt-auto">
+              
+              {/* LIVE BID HISTORY */}
+              <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm flex flex-col h-[280px]">
+                <h3 className="font-bold text-sm text-zinc-200 flex items-center space-x-2 mb-4 shrink-0">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <span>Cronologia Rilanci</span>
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                   {roomData.currentAuction?.bidHistory?.length > 0 ? (
                     roomData.currentAuction.bidHistory.map((item, idx) => (
                       <div
                         key={idx}
-                        className={`p-3 rounded-xl flex items-center justify-between text-xs transition ${
+                        className={`p-3 rounded-xl flex items-center justify-between text-xs transition-colors ${
                           idx === 0 
-                            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold' 
-                            : 'bg-slate-950/40 border border-slate-800/50 text-slate-400'
+                            ? 'bg-amber-500/10 border border-amber-500/20 text-amber-500' 
+                            : 'bg-zinc-950 border border-white/5 text-zinc-400'
                         }`}
                       >
-                        <div className="flex items-center space-x-2">
-                          <span className="font-mono text-slate-500">{item.time}</span>
-                          <span className="text-white font-semibold">{item.bidderName}</span>
-                          {idx === 0 && <span className="text-[10px] bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded font-black">LEADER</span>}
+                        <div className="flex items-center space-x-3">
+                          <span className="font-mono text-[10px] opacity-60">{item.time}</span>
+                          <span className={`font-semibold ${idx === 0 ? 'text-amber-500' : 'text-zinc-200'}`}>{item.bidderName}</span>
+                          {idx === 0 && <span className="text-[9px] bg-amber-500 text-zinc-950 px-1.5 py-0.5 rounded font-black hidden sm:inline">LEADER</span>}
                         </div>
-                        <span className="font-mono text-base font-black text-amber-400">{item.amount} cr</span>
+                        <span className="font-mono text-sm font-black">{item.amount} cr</span>
                       </div>
                     ))
                   ) : (
-                    <p className="text-slate-500 text-xs text-center py-4">In attesa del prossimo giocatore e dei rilanci...</p>
+                    <div className="h-full flex items-center justify-center text-zinc-600 text-xs italic">
+                      Nessun rilancio in corso...
+                    </div>
                   )}
                 </div>
               </div>
 
               {/* COMPLETED AUCTIONS HISTORY */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-base text-white flex items-center space-x-2">
-                    <Award className="w-5 h-5 text-emerald-400" />
-                    <span>Ultime Assegnazioni Effettuate</span>
-                  </h3>
-                </div>
-                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+              <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm flex flex-col h-[280px]">
+                <h3 className="font-bold text-sm text-zinc-200 flex items-center space-x-2 mb-4 shrink-0">
+                  <Award className="w-4 h-4 text-emerald-500" />
+                  <span>Ultime Assegnazioni</span>
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                   {roomData.completedAuctions?.length > 0 ? (
                     roomData.completedAuctions.map((item, idx) => (
-                      <div key={idx} className="p-3 rounded-xl flex items-center justify-between text-xs bg-slate-950/60 border border-slate-800/60">
-                        <div className="flex items-center space-x-3">
-                          <span className="font-mono text-slate-500">{item.time}</span>
+                      <div key={idx} className="p-3 rounded-xl flex items-center justify-between text-xs bg-zinc-950 border border-white/5 group">
+                        <div className="flex items-start space-x-3">
+                          <span className="font-mono text-[10px] text-zinc-500 mt-0.5">{item.time}</span>
                           <div>
-                            <span className="text-white font-bold">{item.playerName}</span>
-                            <span className="text-slate-400 ml-1">({item.playerRole} - {item.playerTeam})</span>
-                            <span className="block text-[10px] text-emerald-400 font-semibold uppercase mt-0.5">Assegnato a {item.winnerName}</span>
+                            <p className="text-zinc-200 font-bold group-hover:text-emerald-400 transition-colors">{item.playerName}</p>
+                            <p className="text-[10px] text-zinc-500 font-medium">Assegnato a <span className="text-emerald-500 font-bold">{item.winnerName}</span></p>
                           </div>
                         </div>
-                        <span className="font-mono text-base font-black text-amber-400">{item.price} cr</span>
+                        <span className="font-mono text-sm font-black text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md">{item.price} cr</span>
                       </div>
                     ))
                   ) : (
-                    <p className="text-slate-500 text-xs text-center py-4">Ancora nessuna assegnazione registrata.</p>
+                    <div className="h-full flex items-center justify-center text-zinc-600 text-xs italic">
+                      Ancora nessuna assegnazione.
+                    </div>
                   )}
                 </div>
               </div>
+
             </div>
+          </div>
 
-            {/* Right Column: User's Dunkest Roster & Quick Standings */}
-            <div className="lg:col-span-4 space-y-6">
+          {/* RIGHT SIDEBAR (Desktop) / ACTIVE CONTENT (Mobile via Tab routing) */}
+          <div className={`w-full md:w-[350px] lg:w-[420px] flex-col gap-6 md:overflow-y-auto custom-scrollbar md:pr-2 shrink-0 ${
+            activeTab === 'auction' ? 'hidden md:flex' : 
+            activeTab === 'admin' ? 'hidden' : // Hide this sidebar in pure Admin view
+            'flex flex-1 md:flex-initial'
+          }`}>
+            
+            {/* Show specific mobile tabs content if not on auction */}
+            {activeTab !== 'auction' && (
+              <div className="md:hidden w-full flex-1">
+                 {/* Mobile Specific Tab Routing Content inside sidebar wrapper area */}
+                 {activeTab === 'rosters' && <MobileRostersView roomData={roomData} />}
+                 {activeTab === 'stats' && <MobileStatsView roomData={roomData} />}
+              </div>
+            )}
+
+            {/* SIDEBAR WIDGETS (Only shown naturally on desktop, or hidden when mobile tabs are active) */}
+            <div className={`flex-col gap-6 ${activeTab === 'auction' ? 'flex' : 'hidden md:flex'}`}>
+              
               {/* CURRENT USER SQUAD SUMMARY */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between pb-4 border-b border-white/5 mb-4">
                   <div>
-                    <h3 className="font-bold text-lg text-white">La Tua Franchigia</h3>
-                    <p className="text-xs text-amber-400 font-medium">{currentParticipant?.teamName}</p>
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">La Tua Rosa</span>
+                    <h3 className="font-bold text-base text-white truncate max-w-[150px]">{currentParticipant?.teamName}</h3>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs text-slate-400 block">Crediti Residui</span>
-                    <span className="text-2xl font-black text-emerald-400">{currentParticipant?.credits || 0}</span>
-                  </div>
-                </div>
-
-                {/* Slots Breakdown Table */}
-                <div className="mt-4 space-y-2">
-                  {/* Guardie */}
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
-                    <div className="flex justify-between items-center text-xs mb-1.5 font-bold">
-                      <span className="text-blue-400">Guardie (G)</span>
-                      <span className="text-slate-400">
-                        {currentParticipant?.roster.filter(p => p.role === 'G').length || 0} / {ROSTER_SLOT_SCHEMA['G'].total}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {currentParticipant?.roster.filter(p => p.role === 'G').map((p, i) => (
-                        <div key={i} className="flex justify-between text-xs text-slate-300">
-                          <span>{p.name} <span className="text-[10px] text-slate-500">({p.team})</span></span>
-                          <span className="text-amber-400 font-mono font-semibold">{p.acquiredPrice} cr</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Ali */}
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
-                    <div className="flex justify-between items-center text-xs mb-1.5 font-bold">
-                      <span className="text-emerald-400">Ali (F)</span>
-                      <span className="text-slate-400">
-                        {currentParticipant?.roster.filter(p => p.role === 'F').length || 0} / {ROSTER_SLOT_SCHEMA['F'].total}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {currentParticipant?.roster.filter(p => p.role === 'F').map((p, i) => (
-                        <div key={i} className="flex justify-between text-xs text-slate-300">
-                          <span>{p.name} <span className="text-[10px] text-slate-500">({p.team})</span></span>
-                          <span className="text-amber-400 font-mono font-semibold">{p.acquiredPrice} cr</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Centri */}
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
-                    <div className="flex justify-between items-center text-xs mb-1.5 font-bold">
-                      <span className="text-purple-400">Centri (C)</span>
-                      <span className="text-slate-400">
-                        {currentParticipant?.roster.filter(p => p.role === 'C').length || 0} / {ROSTER_SLOT_SCHEMA['C'].total}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {currentParticipant?.roster.filter(p => p.role === 'C').map((p, i) => (
-                        <div key={i} className="flex justify-between text-xs text-slate-300">
-                          <span>{p.name} <span className="text-[10px] text-slate-500">({p.team})</span></span>
-                          <span className="text-amber-400 font-mono font-semibold">{p.acquiredPrice} cr</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="text-right bg-zinc-950 border border-white/5 px-3 py-1.5 rounded-xl">
+                    <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-0.5">Budget</span>
+                    <span className="text-lg font-black text-emerald-500 leading-none">{currentParticipant?.credits || 0}</span>
                   </div>
                 </div>
 
-                {/* Status Footer */}
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex justify-between items-center text-xs text-slate-400">
-                  <span>Totale Acquistati:</span>
-                  <span className="font-bold text-white">{currentParticipant?.roster.length || 0} / {TOTAL_ROSTER_SIZE}</span>
+                <div className="space-y-3">
+                  {[
+                    { key: 'G', label: 'Guardie', color: 'blue' },
+                    { key: 'F', label: 'Ali', color: 'emerald' },
+                    { key: 'C', label: 'Centri', color: 'purple' }
+                  ].map(role => {
+                    const players = currentParticipant?.roster.filter(p => p.role === role.key) || [];
+                    const max = ROSTER_SLOT_SCHEMA[role.key].total;
+                    const isFull = players.length >= max;
+
+                    return (
+                      <div key={role.key} className="bg-zinc-950 border border-white/5 p-3 rounded-xl">
+                        <div className="flex justify-between items-center text-xs mb-2">
+                          <span className={`font-bold text-${role.color}-400`}>{role.label}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isFull ? 'bg-zinc-800 text-zinc-300' : 'bg-white/5 text-zinc-400'}`}>
+                            {players.length} / {max}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          {players.map((p, i) => (
+                            <div key={i} className="flex justify-between items-center text-xs group">
+                              <span className="text-zinc-300 font-medium truncate max-w-[180px]">{p.name} <span className="text-[10px] text-zinc-600 ml-1">({p.team})</span></span>
+                              <span className="text-amber-500 font-mono font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">{p.acquiredPrice}</span>
+                            </div>
+                          ))}
+                          {[...Array(Math.max(0, max - players.length))].map((_, i) => (
+                            <div key={`empty-${i}`} className="h-6 flex items-center border border-dashed border-white/5 rounded-md px-2 opacity-50">
+                              <span className="text-[10px] text-zinc-600 font-medium">Slot vuoto</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center text-xs text-zinc-400 font-medium">
+                  <span>Totale Roster</span>
+                  <span className="font-bold text-white px-2 py-1 bg-zinc-800 rounded-md border border-white/5">{currentParticipant?.roster.length || 0} / {TOTAL_ROSTER_SIZE}</span>
                 </div>
               </div>
 
-              {/* PARTICIPANTS IN ROOM LIST */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-3">
-                   <h3 className="font-bold text-sm text-white flex items-center space-x-2">
-                     <Users className="w-4 h-4 text-amber-400" />
-                     <span>Squadre ({roomData.participants.length}/{roomData.maxUsers})</span>
-                   </h3>
-                </div>
-                <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
+              {/* PARTICIPANTS LIST */}
+              <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-bold text-sm text-zinc-200 flex items-center space-x-2 mb-4">
+                  <Users className="w-4 h-4 text-zinc-400" />
+                  <span>Lega ({roomData.participants.length}/{roomData.maxUsers})</span>
+                </h3>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                   {roomData.participants.map((m, idx) => {
                     const isTurn = roomData.activeCallerIndex === idx;
                     return (
                       <div
                         key={m.id}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
+                        className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-colors ${
                           isTurn 
-                            ? 'bg-amber-500/10 border-amber-500/50' 
-                            : 'bg-slate-950/60 border-slate-800/60'
+                            ? 'bg-amber-500/10 border-amber-500/30' 
+                            : 'bg-zinc-950 border-white/5'
                         }`}
                       >
-                        <div className="flex items-center space-x-2">
-                          <span className="font-mono text-slate-500">{idx + 1}.</span>
-                          <div>
-                            <p className="font-bold text-white flex items-center space-x-1">
-                              <span>{m.teamName}</span>
-                              {m.isAdmin && <span className="text-[9px] bg-red-500/30 text-red-300 px-1 rounded">ADM</span>}
-                            </p>
-                            <p className="text-[10px] text-slate-400">{m.name} • {m.roster.length}/{TOTAL_ROSTER_SIZE} acq.</p>
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-[10px] shrink-0 ${isTurn ? 'bg-amber-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}>
+                            {idx + 1}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className={`font-bold truncate max-w-[120px] lg:max-w-[150px] ${isTurn ? 'text-amber-500' : 'text-zinc-200'}`}>
+                              {m.teamName}
+                            </span>
+                            <span className="text-[10px] text-zinc-500">{m.roster.length}/{TOTAL_ROSTER_SIZE} acq.</span>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="font-mono font-bold text-emerald-400">{m.credits} cr</span>
-                          {isTurn && <span className="block text-[9px] text-amber-400 font-bold uppercase">In Turno</span>}
+                          <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md">{m.credits} cr</span>
                         </div>
                       </div>
                     );
@@ -1635,328 +1549,80 @@ export default function App() {
                 </div>
               </div>
             </div>
+
           </div>
-        )}
 
-        {activeTab === 'rosters' && (
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-black text-white">Tutte le Rose della Lega</h2>
-                <p className="text-sm text-slate-400">Verifica in tempo reale crediti spesi e slot occupati per ogni franchigia Dunkest.</p>
-              </div>
-              <button
-                onClick={() => {
-                  const exportJson = JSON.stringify(roomData.participants, null, 2);
-                  navigator.clipboard.writeText(exportJson);
-                  showNotice("Riepilogo Rose copiato negli appunti (JSON)!");
-                }}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center space-x-2"
-              >
-                <Download className="w-4 h-4 text-amber-400" />
-                <span>Esporta o Copia Rose</span>
-              </button>
+          {/* ADMIN FULL WIDTH TAB CONTENT (Desktop & Mobile) */}
+          {activeTab === 'admin' && isAdmin && (
+            <div className="flex-1 overflow-y-auto custom-scrollbar md:pr-4">
+              <AdminView 
+                roomData={roomData} 
+                db={db} 
+                roomCode={roomCode} 
+                PHASES={PHASES} 
+                setAuctionPhase={setAuctionPhase}
+                toggleTurnDirection={toggleTurnDirection}
+                forcePassTurn={forcePassTurn}
+                removeManager={removeManager}
+                deleteRoom={deleteRoom}
+              />
             </div>
+          )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {roomData.participants.map((manager) => {
-                const totalSpent = manager.roster.reduce((acc, p) => acc + (p.acquiredPrice || 0), 0);
-                return (
-                  <div key={manager.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-start pb-3 border-b border-slate-800">
-                        <div>
-                          <h3 className="font-black text-lg text-white">{manager.teamName}</h3>
-                          <p className="text-xs text-slate-400">{manager.name}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs text-slate-400 block">Residuo</span>
-                          <span className="text-xl font-black text-emerald-400">{manager.credits} cr</span>
-                        </div>
-                      </div>
+          {/* DESKTOP FULL WIDTH ROSTER / STATS VIEWS (When actively clicked on Desktop) */}
+          {activeTab === 'rosters' && <div className="hidden md:block flex-1 overflow-y-auto custom-scrollbar md:pr-4"><MobileRostersView roomData={roomData} isDesktop={true} /></div>}
+          {activeTab === 'stats' && <div className="hidden md:block flex-1 overflow-y-auto custom-scrollbar md:pr-4"><MobileStatsView roomData={roomData} isDesktop={true} /></div>}
 
-                      {/* Roster Players List */}
-                      <div className="mt-4 space-y-2">
-                        {manager.roster.length === 0 ? (
-                          <div className="text-center py-8 text-slate-500 text-xs">
-                            Ancora nessun acquisto effettuato.
-                          </div>
-                        ) : (
-                          manager.roster.map((player, pIdx) => (
-                            <div key={pIdx} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs">
-                              <div className="flex items-center space-x-2">
-                                <span className={`w-5 h-5 rounded font-black text-[10px] flex items-center justify-center ${
-                                  player.role === 'G' ? 'bg-blue-600 text-white' :
-                                  player.role === 'F' ? 'bg-emerald-600 text-white' : 'bg-purple-600 text-white'
-                                }`}>
-                                  {player.role}
-                                </span>
-                                <span className="font-semibold text-slate-200">{player.name}</span>
-                                <span className="text-slate-500 font-mono text-[10px]">({player.team})</span>
-                              </div>
-                              <span className="font-mono font-bold text-amber-400">{player.acquiredPrice} cr</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between text-xs text-slate-400">
-                      <span>Spesa Totale: <strong className="text-slate-200">{totalSpent} cr</strong></span>
-                      <span>Slot: <strong className="text-white">{manager.roster.length} / {TOTAL_ROSTER_SIZE}</strong></span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'stats' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-white">Statistiche dell'Asta Dunkest</h2>
-              <p className="text-sm text-slate-400">Analisi approfondita sui crediti spesi, costi medi per ruolo e record acquisti.</p>
-            </div>
-            
-            {/* Role Breakdown Cards */}
-            {(() => {
-              const allBought = roomData.participants.flatMap(p => p.roster);
-              const guardsBought = allBought.filter(p => p.role === 'G');
-              const forwardsBought = allBought.filter(p => p.role === 'F');
-              const centersBought = allBought.filter(p => p.role === 'C');
-
-              const avgG = guardsBought.length ? (guardsBought.reduce((a, b) => a + b.acquiredPrice, 0) / guardsBought.length).toFixed(1) : '0';
-              const avgF = forwardsBought.length ? (forwardsBought.reduce((a, b) => a + b.acquiredPrice, 0) / forwardsBought.length).toFixed(1) : '0';
-              const avgC = centersBought.length ? (centersBought.reduce((a, b) => a + b.acquiredPrice, 0) / centersBought.length).toFixed(1) : '0';
-
-              const topPurchases = [...allBought].sort((a, b) => b.acquiredPrice - a.acquiredPrice).slice(0, 5);
-
-              return (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-lg">
-                      <span className="text-xs text-blue-400 font-bold uppercase tracking-wider">Guardie (G)</span>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-3xl font-black text-white">{avgG} cr</span>
-                        <span className="text-xs text-slate-400">{guardsBought.length} acq.</span>
-                      </div>
-                    </div>
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-lg">
-                      <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Ali (F)</span>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-3xl font-black text-white">{avgF} cr</span>
-                        <span className="text-xs text-slate-400">{forwardsBought.length} acq.</span>
-                      </div>
-                    </div>
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-lg">
-                      <span className="text-xs text-purple-400 font-bold uppercase tracking-wider">Centri (C)</span>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-3xl font-black text-white">{avgC} cr</span>
-                        <span className="text-xs text-slate-400">{centersBought.length} acq.</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Top 5 Most Expensive Players */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                    <h3 className="font-bold text-lg text-white mb-4 flex items-center space-x-2">
-                      <Award className="w-5 h-5 text-amber-400" />
-                      <span>I Giocatori più Costosi dell'Asta</span>
-                    </h3>
-                    <div className="space-y-2">
-                      {topPurchases.length === 0 ? (
-                        <p className="text-slate-500 text-xs py-4 text-center">Nessun giocatore assegnato al momento.</p>
-                      ) : (
-                        topPurchases.map((player, idx) => (
-                          <div key={idx} className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <span className="font-mono font-black text-amber-400 w-5">#{idx + 1}</span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                                player.role === 'G' ? 'bg-blue-600 text-white' :
-                                player.role === 'F' ? 'bg-emerald-600 text-white' : 'bg-purple-600 text-white'
-                              }`}>
-                                {player.role}
-                              </span>
-                              <div>
-                                <span className="font-bold text-sm text-white">{player.name}</span>
-                                <span className="text-xs text-slate-400 ml-2">({player.team})</span>
-                              </div>
-                            </div>
-                            <span className="font-mono text-base font-black text-amber-400">{player.acquiredPrice} cr</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {activeTab === 'admin' && isAdmin && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-red-400 flex items-center space-x-2">
-                <ShieldAlert className="w-6 h-6" />
-                <span>Pannello di Controllo Host & Regolatore</span>
-              </h2>
-              <p className="text-sm text-slate-400">
-                Hai il controllo totale su fasi, tempo, turni e crediti dei manager partecipanti.
-              </p>
-            </div>
-            
-            <div className="flex justify-end mb-4">
-               <button
-                  onClick={deleteRoom}
-                  className="px-4 py-2 bg-red-950 hover:bg-red-900 text-red-300 font-bold rounded-xl border border-red-800 flex items-center space-x-2 transition"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Elimina Stanza Definitivamente</span>
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Phase Switcher */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                <h3 className="font-bold text-white text-base">Cambio Fase d'Asta</h3>
-                <p className="text-xs text-slate-400">
-                  Imposta quale reparto chiamare. Il sistema limita automaticamente le offerte a chi ha slot liberi.
-                </p>
-                <div className="space-y-2">
-                  {PHASES.map((p) => {
-                    const isCurrent = roomData.phase === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => setAuctionPhase(p.id)}
-                        className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between text-xs font-bold transition ${
-                          isCurrent 
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-md' 
-                            : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
-                        }`}
-                      >
-                        <span>{p.name}</span>
-                        {isCurrent && <span className="bg-amber-500 text-slate-950 px-2 py-0.5 rounded text-[10px] uppercase font-black">Attiva</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Turn & Rotation Direction */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                <h3 className="font-bold text-white text-base">Gestione Rotazione Chiamante</h3>
-                <p className="text-xs text-slate-400">
-                  Modifica il senso di chiamata o forza il passaggio di turno in caso di assenze o dubbi.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
-                    <div>
-                      <span className="text-xs text-slate-400 block font-semibold">Direzione Giro:</span>
-                      <span className="text-sm font-bold text-white capitalize">
-                        {roomData.turnDirection === 'clockwise' ? 'Senso Orario (1 → 3)' : 'Senso Antiorario (3 → 1)'}
-                      </span>
-                    </div>
-                    <button
-                      onClick={toggleTurnDirection}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold rounded-lg border border-slate-700"
-                    >
-                      Inverti Giro
-                    </button>
-                  </div>
-                  <button
-                    onClick={forcePassTurn}
-                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center justify-center space-x-2"
-                  >
-                    <FastForward className="w-4 h-4 text-amber-400" />
-                    <span>Forza Passaggio di Turno al Prossimo Manager</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Manual Budget and Roster Editor */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-              <h3 className="font-bold text-white text-base">Modifica Manuale Crediti e Franchigie</h3>
-              <p className="text-xs text-slate-400">
-                Seleziona i crediti manualmente o rimuovi un manager dalla stanza (i suoi giocatori torneranno liberi).
-              </p>
-              <div className="space-y-3">
-                {roomData.participants.map((m, idx) => (
-                  <div key={m.id} className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div>
-                      <span className="font-bold text-white text-sm">{m.teamName}</span>
-                      <span className="text-slate-400 ml-2">({m.name})</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <label className="text-slate-400">Crediti:</label>
-                      <input
-                        type="number"
-                        value={m.credits}
-                        onChange={async (e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          try {
-                            const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
-                            await runTransaction(db, async (transaction) => {
-                              const snap = await transaction.get(roomDocRef);
-                              if(snap.exists()) {
-                                const currentParts = snap.data().participants || [];
-                                const pIdx = currentParts.findIndex(p => p.id === m.id);
-                                if(pIdx > -1) {
-                                  currentParts[pIdx].credits = val;
-                                  transaction.update(roomDocRef, { participants: currentParts });
-                                }
-                              }
-                            });
-                          } catch(err) {}
-                        }}
-                        className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-mono font-bold text-center"
-                      />
-                      <button 
-                        onClick={() => removeManager(m.id)}
-                        className="p-1.5 text-red-400 hover:bg-red-950/40 rounded-lg"
-                        title="Rimuovi manager e reimposta i suoi giocatori liberi"
-                      >
-                        <Trash2 className="w-4 h-4"/>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </main>
 
+      {/* MOBILE BOTTOM NAVIGATION */}
+      <nav className="md:hidden fixed bottom-0 w-full h-16 bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around z-40 px-2 pb-safe">
+        {[
+          { id: 'auction', icon: Flame, label: 'Asta' },
+          { id: 'rosters', icon: Users, label: 'Rose' },
+          { id: 'stats', icon: BarChart3, label: 'Stats' },
+          ...(isAdmin ? [{ id: 'admin', icon: Settings, label: 'Host' }] : [])
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
+              activeTab === tab.id ? 'text-amber-500' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'fill-amber-500/20' : ''}`} />
+            <span className="text-[10px] font-bold tracking-wide">{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* MODALS */}
       {showQRModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative">
-            <button
-              onClick={() => setShowQRModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white text-sm"
-            >
-              ✕
+        <div className="fixed inset-0 z-50 bg-zinc-950/90 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-zinc-900 border border-white/10 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-200">
+            <button onClick={() => setShowQRModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-zinc-800 rounded-full p-1.5 transition">
+              <X className="w-4 h-4" />
             </button>
-            <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <QrCode className="w-6 h-6" />
+            <div className="w-14 h-14 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <QrCode className="w-7 h-7" />
             </div>
-            <h3 className="font-black text-xl text-white">Invita Manager</h3>
-            <p className="text-xs text-slate-400 mt-1 mb-4">
-              I partecipanti possono inquadrare o inserire il codice stanza per collegarsi dal proprio telefono.
+            <h3 className="font-black text-xl text-white mb-2">Invita Manager</h3>
+            <p className="text-xs text-zinc-400 mb-6">
+              I partecipanti possono scansionare o inserire il codice per collegarsi.
             </p>
-            <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-inner">
+            <div className="bg-white p-4 rounded-2xl inline-block mx-auto mb-6">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                   window.location.origin + window.location.pathname + `?room=${roomData.code}`
                 )}`}
                 alt="QR Code Stanza"
-                className="w-44 h-44"
+                className="w-40 h-40"
               />
             </div>
-            <div className="mt-4 bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Codice Stanza Asta</span>
-              <span className="font-mono text-xl font-black text-amber-400 tracking-widest">{roomData.code}</span>
+            <div className="bg-zinc-950 p-4 rounded-xl border border-white/5 mb-6">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Codice Stanza</span>
+              <span className="font-mono text-2xl font-black text-white tracking-widest">{roomData.code}</span>
             </div>
             <button
               onClick={() => {
@@ -1964,13 +1630,298 @@ export default function App() {
                 showNotice("Codice stanza copiato!");
                 setShowQRModal(false);
               }}
-              className="w-full mt-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition"
+              className="w-full py-3.5 bg-white hover:bg-zinc-200 text-zinc-950 font-black rounded-xl text-sm transition-all"
             >
-              Copia Codice Stanza
+              Copia Codice
             </button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENTS FOR TAB VIEWS (Keeps App.jsx modular but single-file)
+   ========================================================================= */
+
+function MobileRostersView({ roomData, isDesktop = false }) {
+  return (
+    <div className={`space-y-6 ${!isDesktop ? 'pb-24' : ''}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-white">Tutte le Rose</h2>
+          <p className="text-xs text-zinc-400 mt-1">Panoramica roster e budget di tutta la lega.</p>
+        </div>
+        <button
+          onClick={() => {
+            const exportJson = JSON.stringify(roomData.participants, null, 2);
+            navigator.clipboard.writeText(exportJson);
+            // Quick native alert since we don't have access to showNotice here easily without prop drilling
+            alert("Riepilogo Rose copiato negli appunti (JSON)!"); 
+          }}
+          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold rounded-lg border border-white/5 flex items-center space-x-2 w-max"
+        >
+          <Download className="w-4 h-4 text-amber-500" />
+          <span>Esporta JSON</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+        {roomData.participants.map((manager) => {
+          const totalSpent = manager.roster.reduce((acc, p) => acc + (p.acquiredPrice || 0), 0);
+          return (
+            <div key={manager.id} className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm flex flex-col">
+              <div className="flex justify-between items-start pb-4 border-b border-white/5 mb-4">
+                <div>
+                  <h3 className="font-black text-lg text-white">{manager.teamName}</h3>
+                  <p className="text-[11px] text-zinc-400 font-medium">{manager.name}</p>
+                </div>
+                <div className="text-right bg-zinc-950 border border-white/5 px-3 py-1.5 rounded-xl">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-0.5">Budget</span>
+                  <span className="text-lg font-black text-emerald-500 leading-none">{manager.credits}</span>
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-2">
+                {manager.roster.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-600 text-xs italic bg-zinc-950 rounded-xl border border-dashed border-white/5">
+                    Nessun acquisto
+                  </div>
+                ) : (
+                  manager.roster.map((player, pIdx) => (
+                    <div key={pIdx} className="bg-zinc-950 p-2.5 rounded-xl border border-white/5 flex items-center justify-between text-xs">
+                      <div className="flex items-center space-x-3">
+                        <span className={`w-6 h-6 rounded-md font-black text-[10px] flex items-center justify-center border ${
+                          player.role === 'G' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                          player.role === 'F' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                        }`}>
+                          {player.role}
+                        </span>
+                        <div className="flex flex-col">
+                           <span className="font-bold text-zinc-200">{player.name}</span>
+                           <span className="text-zinc-500 font-medium text-[10px]">{player.team}</span>
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md">{player.acquiredPrice} cr</span>
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              <div className="mt-4 pt-3 border-t border-white/5 flex justify-between text-[11px] text-zinc-400 font-medium">
+                <span>Spesa: <strong className="text-zinc-200">{totalSpent} cr</strong></span>
+                <span>Slot: <strong className="text-white bg-zinc-800 px-1.5 py-0.5 rounded">{manager.roster.length} / 13</strong></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MobileStatsView({ roomData, isDesktop = false }) {
+  const allBought = roomData.participants.flatMap(p => p.roster);
+  const guardsBought = allBought.filter(p => p.role === 'G');
+  const forwardsBought = allBought.filter(p => p.role === 'F');
+  const centersBought = allBought.filter(p => p.role === 'C');
+
+  const avgG = guardsBought.length ? (guardsBought.reduce((a, b) => a + b.acquiredPrice, 0) / guardsBought.length).toFixed(1) : '0';
+  const avgF = forwardsBought.length ? (forwardsBought.reduce((a, b) => a + b.acquiredPrice, 0) / forwardsBought.length).toFixed(1) : '0';
+  const avgC = centersBought.length ? (centersBought.reduce((a, b) => a + b.acquiredPrice, 0) / centersBought.length).toFixed(1) : '0';
+
+  const topPurchases = [...allBought].sort((a, b) => b.acquiredPrice - a.acquiredPrice).slice(0, 10);
+
+  return (
+    <div className={`space-y-6 ${!isDesktop ? 'pb-24' : ''}`}>
+      <div>
+        <h2 className="text-2xl font-black text-white">Analisi Asta</h2>
+        <p className="text-xs text-zinc-400 mt-1">Dati aggregati su spesa e record in tempo reale.</p>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm">
+          <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest block mb-2">Media Guardie</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-black text-white">{avgG} <span className="text-sm text-zinc-500 font-medium">cr</span></span>
+            <span className="text-[10px] text-zinc-500 font-bold bg-zinc-950 px-2 py-1 rounded-md border border-white/5">{guardsBought.length} acq.</span>
+          </div>
+        </div>
+        <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm">
+          <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest block mb-2">Media Ali</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-black text-white">{avgF} <span className="text-sm text-zinc-500 font-medium">cr</span></span>
+            <span className="text-[10px] text-zinc-500 font-bold bg-zinc-950 px-2 py-1 rounded-md border border-white/5">{forwardsBought.length} acq.</span>
+          </div>
+        </div>
+        <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm col-span-2 md:col-span-1">
+          <span className="text-[10px] text-purple-400 font-bold uppercase tracking-widest block mb-2">Media Centri</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-black text-white">{avgC} <span className="text-sm text-zinc-500 font-medium">cr</span></span>
+            <span className="text-[10px] text-zinc-500 font-bold bg-zinc-950 px-2 py-1 rounded-md border border-white/5">{centersBought.length} acq.</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 md:p-6 shadow-sm">
+        <h3 className="font-bold text-sm text-white mb-5 flex items-center space-x-2">
+          <Award className="w-4 h-4 text-amber-500" />
+          <span>Top 10 Acquisti Più Costosi</span>
+        </h3>
+        <div className="space-y-2">
+          {topPurchases.length === 0 ? (
+            <div className="text-center py-8 text-zinc-600 text-xs italic bg-zinc-950 rounded-xl border border-dashed border-white/5">
+              Nessun acquisto
+            </div>
+          ) : (
+            topPurchases.map((player, idx) => (
+              <div key={idx} className="bg-zinc-950 p-3 md:p-4 rounded-xl border border-white/5 flex items-center justify-between group">
+                <div className="flex items-center space-x-3 md:space-x-4">
+                  <span className="font-mono font-black text-zinc-600 w-4 md:w-6 text-right text-xs md:text-sm">{idx + 1}°</span>
+                  <span className={`w-6 h-6 md:w-8 md:h-8 rounded-lg text-[10px] md:text-xs font-black flex items-center justify-center border shrink-0 ${
+                    player.role === 'G' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                    player.role === 'F' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                  }`}>
+                    {player.role}
+                  </span>
+                  <div>
+                    <p className="font-bold text-sm text-zinc-200">{player.name}</p>
+                    <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{player.team}</p>
+                  </div>
+                </div>
+                <span className="font-mono text-sm md:text-base font-black text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg">{player.acquiredPrice} cr</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminView({ roomData, db, roomCode, PHASES, setAuctionPhase, toggleTurnDirection, forcePassTurn, removeManager, deleteRoom }) {
+  return (
+    <div className="space-y-6 pb-24 md:pb-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-red-500/5 border border-red-500/20 rounded-2xl p-5">
+        <div>
+          <h2 className="text-2xl font-black text-red-500 flex items-center space-x-2">
+            <ShieldAlert className="w-6 h-6" />
+            <span>Pannello Host</span>
+          </h2>
+          <p className="text-xs text-red-400/80 mt-1">Controllo totale su fasi, tempo, turni e crediti della stanza.</p>
+        </div>
+        <button
+          onClick={deleteRoom}
+          className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl border border-red-500/30 flex items-center space-x-2 transition text-sm"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Elimina Stanza</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Phase Switcher */}
+        <div className="bg-zinc-900 border border-white/5 rounded-2xl p-6 shadow-sm">
+          <div className="mb-4">
+            <h3 className="font-bold text-white text-base">Fase d'Asta</h3>
+            <p className="text-[11px] text-zinc-400 mt-1">Il sistema blocca in automatico i ruoli non permessi.</p>
+          </div>
+          <div className="space-y-2">
+            {PHASES.map((p) => {
+              const isCurrent = roomData.phase === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setAuctionPhase(p.id)}
+                  className={`w-full p-4 rounded-xl border text-left flex items-center justify-between text-xs font-bold transition-all ${
+                    isCurrent 
+                      ? 'bg-amber-500/10 border-amber-500/50 text-amber-500 shadow-sm ring-1 ring-amber-500/50' 
+                      : 'bg-zinc-950 border-white/5 text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  <span>{p.name}</span>
+                  {isCurrent && <span className="bg-amber-500 text-zinc-950 px-2 py-0.5 rounded text-[9px] uppercase font-black">Attiva</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Turn & Rotation */}
+        <div className="bg-zinc-900 border border-white/5 rounded-2xl p-6 shadow-sm">
+          <div className="mb-4">
+             <h3 className="font-bold text-white text-base">Gestione Rotazione</h3>
+             <p className="text-[11px] text-zinc-400 mt-1">Controlla chi chiama il prossimo giocatore.</p>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-zinc-950 rounded-xl border border-white/5">
+              <div>
+                <span className="text-[10px] text-zinc-500 block font-bold uppercase tracking-wider mb-1">Senso Giro</span>
+                <span className="text-sm font-bold text-white">
+                  {roomData.turnDirection === 'clockwise' ? 'Orario (1 → 2 → 3)' : 'Antiorario (3 → 2 → 1)'}
+                </span>
+              </div>
+              <button onClick={toggleTurnDirection} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-amber-500 text-xs font-bold rounded-lg border border-white/5 transition">
+                Inverti
+              </button>
+            </div>
+            <button onClick={forcePassTurn} className="w-full py-4 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold rounded-xl border border-white/5 flex items-center justify-center space-x-2 transition">
+              <FastForward className="w-4 h-4 text-amber-500" />
+              <span>Forza Passaggio Turno</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Manual Budget Editor */}
+      <div className="bg-zinc-900 border border-white/5 rounded-2xl p-6 shadow-sm">
+        <div className="mb-5">
+           <h3 className="font-bold text-white text-base">Modifica Manuale Manager</h3>
+           <p className="text-[11px] text-zinc-400 mt-1">Correggi crediti o espelli manager (i giocatori torneranno liberi).</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {roomData.participants.map((m) => (
+            <div key={m.id} className="p-4 bg-zinc-950 rounded-xl border border-white/5 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="font-bold text-white text-sm">{m.teamName}</span>
+                <span className="text-[10px] text-zinc-500 font-medium">{m.name}</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="flex flex-col items-end">
+                   <label className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider mb-1">Crediti</label>
+                   <input
+                     type="number"
+                     value={m.credits}
+                     onChange={async (e) => {
+                       const val = parseInt(e.target.value) || 0;
+                       try {
+                         const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+                         await runTransaction(db, async (transaction) => {
+                           const snap = await transaction.get(roomDocRef);
+                           if(snap.exists()) {
+                             const currentParts = snap.data().participants || [];
+                             const pIdx = currentParts.findIndex(p => p.id === m.id);
+                             if(pIdx > -1) {
+                               currentParts[pIdx].credits = val;
+                               transaction.update(roomDocRef, { participants: currentParts });
+                             }
+                           }
+                         });
+                       } catch(err) {}
+                     }}
+                     className="w-16 px-2 py-1.5 bg-zinc-900 border border-white/10 rounded-md text-amber-500 font-mono font-bold text-center focus:outline-none focus:border-amber-500 text-sm"
+                   />
+                </div>
+                <button onClick={() => removeManager(m.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg border border-transparent hover:border-red-500/20 transition mt-3" title="Espelli">
+                  <Trash2 className="w-4 h-4"/>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
