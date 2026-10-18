@@ -3,12 +3,12 @@ import {
   Trophy, Users, Play, Pause, RotateCcw, Clock,
   Search, ShieldAlert, Award, AlertCircle,
   Volume2, VolumeX, QrCode, Download, Settings,
-  LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2
+  LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2, Ban
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import {
-  getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, runTransaction
+  getFirestore, doc, setDoc, deleteDoc, onSnapshot, runTransaction
 } from 'firebase/firestore';
 
 /* STREAMING_CHUNK:Firebase Configuration... */
@@ -32,7 +32,6 @@ export const getNow = () => Date.now() + globalTimeOffset;
 const syncTimeWithNetwork = async () => {
   try {
     const start = Date.now();
-    // Tenta di recuperare l'orario dall'header HTTP del server corrente
     const res = await fetch(window.location.origin, { method: 'HEAD', cache: 'no-store' }).catch(() => null);
     const dateHeader = res?.headers?.get('date');
 
@@ -41,7 +40,6 @@ const syncTimeWithNetwork = async () => {
       const latency = (Date.now() - start) / 2;
       globalTimeOffset = serverTime - (start + latency);
     } else {
-      // Fallback su un'API di time pubblica se in localhost o header non presente
       const fallbackRes = await fetch('https://worldtimeapi.org/api/timezone/Etc/UTC', { cache: 'no-store' });
       const data = await fallbackRes.json();
       const serverTime = new Date(data.utc_datetime).getTime();
@@ -52,14 +50,13 @@ const syncTimeWithNetwork = async () => {
     console.warn("Sync orario fallito, si utilizza l'orologio locale", e);
   }
 };
-// Avvio immediato della sincronizzazione
 syncTimeWithNetwork();
 
 /* STREAMING_CHUNK:Persistent ID Logic... */
 const getOrCreateUserId = () => {
   let uid = sessionStorage.getItem('dunkest_session_uid');
   if (!uid) {
-    uid = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(); // Qui è ok Date.now() perchè è solo per generare un ID
+    uid = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
     sessionStorage.setItem('dunkest_session_uid', uid);
   }
   return uid;
@@ -101,20 +98,18 @@ const playBidSound = () => {
 };
 
 /* STREAMING_CHUNK:Dunkest Schema Rules... */
-const TOTAL_ROSTER_SIZE = 11;
+const TOTAL_ROSTER_SIZE = 13;
 const ROSTER_SLOT_SCHEMA = {
-  G: { total: 4 },
-  F: { total: 4 },
-  C: { total: 2 },
-  HC: { total: 1 }
+  G: { starters: 4, total: 5 },
+  F: { starters: 4, total: 5 },
+  C: { starters: 2, total: 3 }
 };
 
 const PHASES = [
-  { id: 'guardie_starters', name: '1. Guardie (G)', allowedRoles: ['G'], isBench: false },
-  { id: 'ali_starters', name: '2. Ali (F)', allowedRoles: ['F'], isBench: false },
-  { id: 'centri_starters', name: '3. Centri (C)', allowedRoles: ['C'], isBench: false },
-  { id: 'coach_starters', name: '4. Allenatori (HC)', allowedRoles: ['HC'], isBench: false },
-  { id: 'riserve_libere', name: '5. Riserve (Asta Libera)', allowedRoles: ['G', 'F', 'C'], isBench: true }
+  { id: 'guardie_starters', name: '1. Guardie Titolari (G)', allowedRoles: ['G'], isBench: false },
+  { id: 'ali_starters', name: '2. Ali Titolari (F)', allowedRoles: ['F'], isBench: false },
+  { id: 'centri_starters', name: '3. Centri Titolari (C)', allowedRoles: ['C'], isBench: false },
+  { id: 'riserve_libere', name: '4. Riserve (Asta Libera)', allowedRoles: ['G', 'F', 'C'], isBench: true }
 ];
 
 /* STREAMING_CHUNK:App Component Initialization... */
@@ -142,11 +137,16 @@ export default function App() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [playersDB, setPlayersDB] = useState([]);
   const [isPlayersLoading, setIsPlayersLoading] = useState(true);
+  
+  // Extra Creation Fields
+  const [maxUsers, setMaxUsers] = useState(8);
+
   const [roomData, setRoomData] = useState({
     code: 'DUNKEST25',
     phase: 'guardie_starters',
     initialBudget: 200,
     timerSeconds: 20,
+    maxUsers: 8,
     isTimerPaused: false,
     activeCallerIndex: 0,
     turnDirection: 'clockwise',
@@ -171,10 +171,11 @@ export default function App() {
         const rawJson = await response.json();
         
         const mappedPlayers = rawJson.map((p, index) => {
+          if (p.Position === 'Head Coach') return null; // Eliminiamo i coach
+          
           let role = 'G';
           if (p.Position === 'Forward') role = 'F';
           if (p.Position === 'Center') role = 'C';
-          if (p.Position === 'Head Coach') role = 'HC';
           const priceParsed = parseFloat((p["Cr 26/27"] || "1,0").replace(',', '.')) || 4.0;
           return {
             id: `p_${index}`,
@@ -184,7 +185,8 @@ export default function App() {
             basePrice: priceParsed,
             tier: p.Position
           };
-        });
+        }).filter(Boolean);
+        
         setPlayersDB(mappedPlayers);
       } catch (error) {
         console.error("Failed to load players.json:", error);
@@ -213,7 +215,6 @@ export default function App() {
       }
     });
 
-    // Risincronizza regolarmente l'orologio ogni 5 minuti per compensare eventuali rallentamenti hardware
     const clockSyncInterval = setInterval(syncTimeWithNetwork, 300000);
 
     return () => {
@@ -259,7 +260,7 @@ export default function App() {
     }
 
     const interval = setInterval(() => {
-      const now = getNow(); // <-- UTILIZZA ORARIO SINCRONIZZATO
+      const now = getNow();
       let diff = Math.max(0, Math.ceil((roomData.currentAuction.endsAt - now) / 1000));
       
       const maxTimer = roomData.timerSeconds || 20;
@@ -287,7 +288,6 @@ export default function App() {
         
         if (!currentData.currentAuction) return;
 
-        // SERVER TIME VALIDATION UTILIZZANDO ORARIO SINCRONIZZATO
         if (!currentData.isTimerPaused && getNow() < currentData.currentAuction.serverExpirationThreshold) {
             return;
         }
@@ -324,7 +324,7 @@ export default function App() {
     }
   };
 
-  /* STREAMING_CHUNK:Defining Phase Validation... */
+  /* STREAMING_CHUNK:Defining Phase Validation & Restrictions... */
   const getNextCallerIndex = (currentIndex, participantsList, serverRoomData = roomData) => {
     if (!participantsList || participantsList.length === 0) return 0;
     const step = serverRoomData.turnDirection === 'counter-clockwise' ? -1 : 1;
@@ -342,45 +342,33 @@ export default function App() {
     return currentIndex;
   };
 
-  const triggerStateUpdate = async (newState) => {
-    setRoomData(newState);
-    if (db) {
-      try {
-        const cleanCode = (newState.code || roomCode).trim().toUpperCase();
-        const roomDocRef = doc(db, 'rooms', cleanCode);
-        await setDoc(roomDocRef, newState, { merge: true });
-      } catch (err) {
-        console.error("Firestore update failed:", err);
-      }
-    }
+  const hasSpecificSlotForPlayer = (participant, playerRole, phaseId) => {
+    if (!participant) return false;
+    const count = participant.roster.filter(p => p.role === playerRole).length;
+    const isReservePhase = phaseId === 'riserve_libere';
+    const max = isReservePhase ? ROSTER_SLOT_SCHEMA[playerRole].total : ROSTER_SLOT_SCHEMA[playerRole].starters;
+    return count < max;
+  };
+
+  const hasTeamSlotForPlayer = (participant, teamAbbr) => {
+    if (!participant || !teamAbbr) return true;
+    const count = participant.roster.filter(p => p.team === teamAbbr).length;
+    return count < 2;
   };
 
   const canParticipantBid = (participant, currentPhaseId) => {
     if (!participant) return false;
-    const currentPhase = PHASES.find(p => p.id === currentPhaseId) || PHASES[0];
-
-    const guards = participant.roster.filter(p => p.role === 'G').length;
-    const forwards = participant.roster.filter(p => p.role === 'F').length;
-    const centers = participant.roster.filter(p => p.role === 'C').length;
-    const coaches = participant.roster.filter(p => p.role === 'HC').length;
-
-    if (currentPhase.id === 'guardie_starters') return guards < ROSTER_SLOT_SCHEMA['G'].total;
-    if (currentPhase.id === 'ali_starters') return forwards < ROSTER_SLOT_SCHEMA['F'].total;
-    if (currentPhase.id === 'centri_starters') return centers < ROSTER_SLOT_SCHEMA['C'].total;
-    if (currentPhase.id === 'coach_starters') return coaches < ROSTER_SLOT_SCHEMA['HC'].total;
     
-    if (currentPhase.id === 'riserve_libere') {
+    // In asta libera verifichiamo solo se ha spazio totale
+    if (currentPhaseId === 'riserve_libere') {
       return participant.roster.length < TOTAL_ROSTER_SIZE;
     }
-
-    return true;
-  };
-
-  const hasSpecificSlotForPlayer = (participant, playerRole) => {
-    if (!participant) return false;
-    const count = participant.roster.filter(p => p.role === playerRole).length;
-    const max = ROSTER_SLOT_SCHEMA[playerRole]?.total || 0;
-    return count < max;
+    
+    // Nelle altre fasi verifichiamo il limite 'starters' per il ruolo attivo
+    const phaseConfig = PHASES.find(p => p.id === currentPhaseId);
+    if (!phaseConfig) return false;
+    const activeRole = phaseConfig.allowedRoles[0]; // G, F o C
+    return hasSpecificSlotForPlayer(participant, activeRole, currentPhaseId);
   };
 
   const getRemainingRequiredSlots = (participant) => {
@@ -393,14 +381,17 @@ export default function App() {
     return Math.max(0, participant.credits - futureSlots);
   };
 
-  /* STREAMING_CHUNK:Safe Room Join Logic... */
+  /* STREAMING_CHUNK:Safe Room Join Logic with Smart Reconnection... */
   const handleJoinOrCreate = async (asAdmin = false) => {
     const cleanRoom = roomCode.trim().toUpperCase();
+    const tName = teamName.trim();
+    const mName = managerName.trim();
+
     if (!cleanRoom) {
       showNotice("Inserisci un codice stanza!");
       return;
     }
-    if (!teamName.trim() || !managerName.trim()) {
+    if (!tName || !mName) {
       showNotice("Inserisci sia il tuo nome che il nome della tua franchigia Dunkest!");
       return;
     }
@@ -408,61 +399,77 @@ export default function App() {
     const currentUserId = user?.uid || getOrCreateUserId();
     const newParticipant = {
       id: currentUserId,
-      name: managerName.trim(),
-      teamName: teamName.trim(),
+      name: mName,
+      teamName: tName,
       credits: 200, 
       roster: [],
-      isAdmin: asAdmin
+      isAdmin: false
     };
 
     if (db) {
       try {
         const roomDocRef = doc(db, 'rooms', cleanRoom);
+        
         await runTransaction(db, async (transaction) => {
           const roomSnap = await transaction.get(roomDocRef);
           
-          let serverData;
           if (!roomSnap.exists()) {
-            serverData = {
+            if (!asAdmin) {
+              throw new Error("La stanza non esiste. Devi prima crearla come Host.");
+            }
+            const serverData = {
               code: cleanRoom,
               phase: 'guardie_starters',
               initialBudget: 200,
               timerSeconds: 20,
+              maxUsers: parseInt(maxUsers) || 8,
               isTimerPaused: false,
               activeCallerIndex: 0,
               turnDirection: 'clockwise',
               currentAuction: null,
-              participants: [newParticipant],
+              participants: [{ ...newParticipant, isAdmin: true }],
               boughtPlayers: []
             };
             transaction.set(roomDocRef, serverData);
+            return { joinedAsAdmin: true };
           } else {
-            serverData = roomSnap.data();
-            const list = serverData.participants || [];
-            const idx = list.findIndex(p => p.id === currentUserId);
+            if (asAdmin) {
+              throw new Error("Questa stanza esiste già! Non puoi crearne una nuova con questo codice. Accedi come Manager.");
+            }
             
-            if (idx >= 0) {
-              list[idx] = { ...list[idx], name: newParticipant.name, teamName: newParticipant.teamName, isAdmin: asAdmin || list[idx].isAdmin };
+            const serverData = roomSnap.data();
+            const list = serverData.participants || [];
+            
+            // Check if team name already exists to re-attach session
+            const existingIdx = list.findIndex(p => p.teamName.toLowerCase() === tName.toLowerCase());
+            
+            if (existingIdx >= 0) {
+              // Re-attach utente: Aggiorniamo l'ID al nuovo ID sessione
+              list[existingIdx] = { ...list[existingIdx], id: currentUserId, name: mName };
             } else {
+              // Nuovo partecipante: controlliamo capacità stanza
+              if (list.length >= (serverData.maxUsers || 8)) {
+                throw new Error(`Stanza piena! È stato raggiunto il limite massimo di ${serverData.maxUsers || 8} franchigie.`);
+              }
               list.push(newParticipant);
             }
+            
             transaction.update(roomDocRef, { participants: list });
-            serverData.participants = list;
+            return { joinedAsAdmin: existingIdx >= 0 ? list[existingIdx].isAdmin : false };
           }
-
-          setRoomData(serverData);
+        }).then((result) => {
+          sessionStorage.setItem('dunk_roomCode', cleanRoom);
+          sessionStorage.setItem('dunk_teamName', tName);
+          sessionStorage.setItem('dunk_managerName', mName);
+          sessionStorage.setItem('dunk_hasJoined', 'true');
+          sessionStorage.setItem('dunk_isAdmin', String(result.joinedAsAdmin));
+          
+          setIsAdmin(result.joinedAsAdmin);
+          setHasJoined(true);
+          showNotice(`Benvenuto all'asta Dunkest, ${tName}!`);
+        }).catch((err) => {
+          showNotice(err.message || "Errore durante l'accesso alla stanza.");
         });
-
-        sessionStorage.setItem('dunk_roomCode', cleanRoom);
-        sessionStorage.setItem('dunk_teamName', newParticipant.teamName);
-        sessionStorage.setItem('dunk_managerName', newParticipant.name);
-        sessionStorage.setItem('dunk_hasJoined', 'true');
-        sessionStorage.setItem('dunk_isAdmin', String(asAdmin));
-        
-        setIsAdmin(asAdmin);
-        setHasJoined(true);
-        showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}!`);
-        return;
 
       } catch (err) {
         console.error("Transazione fallita:", err);
@@ -480,6 +487,15 @@ export default function App() {
     const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
     if (!currentParticipant) return;
 
+    if (!hasSpecificSlotForPlayer(currentParticipant, selectedNominee.role, roomData.phase)) {
+      showNotice(`Non hai slot disponibili per questo ruolo nella fase corrente.`);
+      return;
+    }
+    if (!hasTeamSlotForPlayer(currentParticipant, selectedNominee.team)) {
+      showNotice(`Non puoi aprire l'asta: hai già raggiunto il limite di 2 giocatori per i ${selectedNominee.team}.`);
+      return;
+    }
+
     const maxBid = getMaxBidAllowed(currentParticipant);
     const startPrice = Math.max(1, parseInt(openingBid) || 1);
 
@@ -489,8 +505,6 @@ export default function App() {
     }
 
     const timerDuration = roomData.timerSeconds || 20;
-    
-    // Scadenza calcolata in base all'orario globale sincronizzato
     const now = getNow();
     const localEndsAt = now + (timerDuration * 1000);
     const serverExpirationThreshold = localEndsAt + 1500; 
@@ -528,8 +542,13 @@ export default function App() {
     const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
     if (!currentParticipant || !roomData.currentAuction) return;
 
-    if (!hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role)) {
-      showNotice(`Hai già completato tutti gli slot disponibili per il ruolo ${roomData.currentAuction.player.role}!`);
+    if (!hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role, roomData.phase)) {
+      showNotice(`Hai già completato tutti gli slot disponibili per questo ruolo.`);
+      return;
+    }
+    
+    if (!hasTeamSlotForPlayer(currentParticipant, roomData.currentAuction.player.team)) {
+      showNotice(`Hai già raggiunto il limite massimo di 2 giocatori per i ${roomData.currentAuction.player.team}.`);
       return;
     }
 
@@ -543,7 +562,6 @@ export default function App() {
         
         if (!currentData.currentAuction) throw new Error("Asta già chiusa!");
 
-        // Server check to strictly block phantom bids after time expired using synced clock
         if (!currentData.isTimerPaused && getNow() > currentData.currentAuction.serverExpirationThreshold) {
            throw new Error("L'asta è terminata.");
         }
@@ -558,7 +576,7 @@ export default function App() {
         if (targetBid > maxAllowed) throw new Error(`Supera il tetto massimo (${maxAllowed} cr)`);
 
         const timerDuration = currentData.timerSeconds || 20;
-        const localEndsAt = getNow() + (timerDuration * 1000); // <-- UTILIZZA ORARIO SINCRONIZZATO
+        const localEndsAt = getNow() + (timerDuration * 1000);
 
         const newHistoryEntry = {
           bidderId: currentParticipant.id,
@@ -837,6 +855,19 @@ export default function App() {
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium focus:outline-none focus:border-amber-500 transition"
               />
             </div>
+            {!isFromQRCode && (
+              <div>
+                <label className="text-xs font-semibold uppercase text-slate-400 block mb-1">Max Squadre (Solo Creazione Host)</label>
+                <input
+                  type="number"
+                  min="2"
+                  max="20"
+                  value={maxUsers}
+                  onChange={(e) => setMaxUsers(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+            )}
 
             <div className={`pt-2 grid gap-3 ${isFromQRCode ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <button
@@ -868,8 +899,9 @@ export default function App() {
                 <Info className="w-3.5 h-3.5 mr-1" />
                 <span>Regole Squadra Dunkest:</span>
               </div>
-              <p>• {TOTAL_ROSTER_SIZE} membri totali (4 Guardie, 4 Ali, 2 Centri, 1 Allenatore).</p>
-              <p>• Offerte sincronizzate in tempo reale con timer 20s e riserva crediti automatica.</p>
+              <p>• {TOTAL_ROSTER_SIZE} membri totali (5 Guardie, 5 Ali, 3 Centri).</p>
+              <p>• Max 2 giocatori della stessa squadra NBA.</p>
+              <p>• Offerte sincronizzate in tempo reale con timer 20s.</p>
             </div>
           </div>
         </div>
@@ -933,7 +965,7 @@ export default function App() {
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Rose ({roomData.participants.length})</span>
+            <span className="hidden sm:inline">Rose ({roomData.participants.length}/{roomData.maxUsers})</span>
           </button>
           <button
             onClick={() => setActiveTab('stats')}
@@ -1035,12 +1067,10 @@ export default function App() {
                       <div className="flex items-center space-x-2">
                         <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase tracking-wider ${
                           roomData.currentAuction.player.role === 'G' ? 'bg-blue-500 text-slate-950' :
-                          roomData.currentAuction.player.role === 'F' ? 'bg-emerald-500 text-slate-950' : 
-                          roomData.currentAuction.player.role === 'HC' ? 'bg-gray-200 text-slate-950' : 'bg-purple-500 text-white'
+                          roomData.currentAuction.player.role === 'F' ? 'bg-emerald-500 text-slate-950' : 'bg-purple-500 text-white'
                         }`}>
                           {roomData.currentAuction.player.role === 'G' ? 'Guardia (G)' : 
-                           roomData.currentAuction.player.role === 'F' ? 'Ala (F)' : 
-                           roomData.currentAuction.player.role === 'HC' ? 'Coach (HC)' : 'Centro (C)'}
+                           roomData.currentAuction.player.role === 'F' ? 'Ala (F)' : 'Centro (C)'}
                         </span>
                         <span className="text-slate-400 font-mono text-xs">{roomData.currentAuction.player.team}</span>
                         <span className="text-amber-400 text-xs font-semibold">Quotaz. Dunkest: {roomData.currentAuction.player.basePrice} cr</span>
@@ -1094,7 +1124,8 @@ export default function App() {
 
                   {/* BIDDING CONTROLS */}
                   {(() => {
-                    const hasSlot = hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role);
+                    const hasSlot = hasSpecificSlotForPlayer(currentParticipant, roomData.currentAuction.player.role, roomData.phase);
+                    const hasTeamSlot = hasTeamSlotForPlayer(currentParticipant, roomData.currentAuction.player.team);
                     const maxAllowed = currentParticipant ? getMaxBidAllowed(currentParticipant) : 0;
 
                     return (
@@ -1103,9 +1134,16 @@ export default function App() {
                           <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-2xl flex items-center space-x-3 text-red-300 text-sm">
                             <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400" />
                             <span>
-                              <strong>Sei spettatore per questo giocatore:</strong> Hai già riempito tutti gli slot per il ruolo {roomData.currentAuction.player.role}.
+                              <strong>Sei spettatore:</strong> Hai già riempito tutti gli slot per il ruolo {roomData.currentAuction.player.role} in questa fase.
                             </span>
                           </div>
+                        ) : !hasTeamSlot ? (
+                           <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-2xl flex items-center space-x-3 text-red-300 text-sm">
+                             <Ban className="w-5 h-5 flex-shrink-0 text-red-400" />
+                             <span>
+                               <strong>Limite Squadra NBA:</strong> Hai già 2 giocatori per i <strong>{roomData.currentAuction.player.team}</strong>. Non puoi offrire per altri.
+                             </span>
+                           </div>
                         ) : maxAllowed <= roomData.currentAuction.currentBid ? (
                           <div className="p-4 bg-amber-950/30 border border-amber-800/50 rounded-2xl flex items-center space-x-3 text-amber-300 text-sm">
                             <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-400" />
@@ -1264,7 +1302,6 @@ export default function App() {
                               <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center ${
                                 player.role === 'G' ? 'bg-blue-600/30 text-blue-400 border border-blue-500/40' :
                                 player.role === 'F' ? 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40' :
-                                player.role === 'HC' ? 'bg-gray-600/30 text-gray-200 border border-gray-500/40' :
                                 'bg-purple-600/30 text-purple-400 border border-purple-500/40'
                               }`}>
                                 {player.role}
@@ -1389,7 +1426,7 @@ export default function App() {
                     <div className="space-y-1">
                       {currentParticipant?.roster.filter(p => p.role === 'G').map((p, i) => (
                         <div key={i} className="flex justify-between text-xs text-slate-300">
-                          <span>{p.name} ({p.team})</span>
+                          <span>{p.name} <span className="text-[10px] text-slate-500">({p.team})</span></span>
                           <span className="text-amber-400 font-mono font-semibold">{p.acquiredPrice} cr</span>
                         </div>
                       ))}
@@ -1407,7 +1444,7 @@ export default function App() {
                     <div className="space-y-1">
                       {currentParticipant?.roster.filter(p => p.role === 'F').map((p, i) => (
                         <div key={i} className="flex justify-between text-xs text-slate-300">
-                          <span>{p.name} ({p.team})</span>
+                          <span>{p.name} <span className="text-[10px] text-slate-500">({p.team})</span></span>
                           <span className="text-amber-400 font-mono font-semibold">{p.acquiredPrice} cr</span>
                         </div>
                       ))}
@@ -1425,25 +1462,7 @@ export default function App() {
                     <div className="space-y-1">
                       {currentParticipant?.roster.filter(p => p.role === 'C').map((p, i) => (
                         <div key={i} className="flex justify-between text-xs text-slate-300">
-                          <span>{p.name} ({p.team})</span>
-                          <span className="text-amber-400 font-mono font-semibold">{p.acquiredPrice} cr</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Coach */}
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
-                    <div className="flex justify-between items-center text-xs mb-1.5 font-bold">
-                      <span className="text-gray-300">Allenatori (HC)</span>
-                      <span className="text-slate-400">
-                        {currentParticipant?.roster.filter(p => p.role === 'HC').length || 0} / {ROSTER_SLOT_SCHEMA['HC'].total}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {currentParticipant?.roster.filter(p => p.role === 'HC').map((p, i) => (
-                        <div key={i} className="flex justify-between text-xs text-slate-300">
-                          <span>{p.name} ({p.team})</span>
+                          <span>{p.name} <span className="text-[10px] text-slate-500">({p.team})</span></span>
                           <span className="text-amber-400 font-mono font-semibold">{p.acquiredPrice} cr</span>
                         </div>
                       ))}
@@ -1460,10 +1479,12 @@ export default function App() {
 
               {/* PARTICIPANTS IN ROOM LIST */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                <h3 className="font-bold text-sm text-white mb-3 flex items-center space-x-2">
-                  <Users className="w-4 h-4 text-amber-400" />
-                  <span>Partecipanti alla Stanza ({roomData.participants.length})</span>
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                   <h3 className="font-bold text-sm text-white flex items-center space-x-2">
+                     <Users className="w-4 h-4 text-amber-400" />
+                     <span>Squadre ({roomData.participants.length}/{roomData.maxUsers})</span>
+                   </h3>
+                </div>
                 <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
                   {roomData.participants.map((m, idx) => {
                     const isTurn = roomData.activeCallerIndex === idx;
@@ -1548,8 +1569,7 @@ export default function App() {
                               <div className="flex items-center space-x-2">
                                 <span className={`w-5 h-5 rounded font-black text-[10px] flex items-center justify-center ${
                                   player.role === 'G' ? 'bg-blue-600 text-white' :
-                                  player.role === 'F' ? 'bg-emerald-600 text-white' :
-                                  player.role === 'HC' ? 'bg-gray-600 text-white' : 'bg-purple-600 text-white'
+                                  player.role === 'F' ? 'bg-emerald-600 text-white' : 'bg-purple-600 text-white'
                                 }`}>
                                   {player.role}
                                 </span>
@@ -1586,18 +1606,16 @@ export default function App() {
               const guardsBought = allBought.filter(p => p.role === 'G');
               const forwardsBought = allBought.filter(p => p.role === 'F');
               const centersBought = allBought.filter(p => p.role === 'C');
-              const coachesBought = allBought.filter(p => p.role === 'HC');
 
               const avgG = guardsBought.length ? (guardsBought.reduce((a, b) => a + b.acquiredPrice, 0) / guardsBought.length).toFixed(1) : '0';
               const avgF = forwardsBought.length ? (forwardsBought.reduce((a, b) => a + b.acquiredPrice, 0) / forwardsBought.length).toFixed(1) : '0';
               const avgC = centersBought.length ? (centersBought.reduce((a, b) => a + b.acquiredPrice, 0) / centersBought.length).toFixed(1) : '0';
-              const avgHC = coachesBought.length ? (coachesBought.reduce((a, b) => a + b.acquiredPrice, 0) / coachesBought.length).toFixed(1) : '0';
 
               const topPurchases = [...allBought].sort((a, b) => b.acquiredPrice - a.acquiredPrice).slice(0, 5);
 
               return (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-lg">
                       <span className="text-xs text-blue-400 font-bold uppercase tracking-wider">Guardie (G)</span>
                       <div className="mt-2 flex items-baseline justify-between">
@@ -1619,14 +1637,6 @@ export default function App() {
                         <span className="text-xs text-slate-400">{centersBought.length} acq.</span>
                       </div>
                     </div>
-                    
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-lg">
-                      <span className="text-xs text-gray-300 font-bold uppercase tracking-wider">Coach (HC)</span>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-3xl font-black text-white">{avgHC} cr</span>
-                        <span className="text-xs text-slate-400">{coachesBought.length} acq.</span>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Top 5 Most Expensive Players */}
@@ -1645,8 +1655,7 @@ export default function App() {
                               <span className="font-mono font-black text-amber-400 w-5">#{idx + 1}</span>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
                                 player.role === 'G' ? 'bg-blue-600 text-white' :
-                                player.role === 'F' ? 'bg-emerald-600 text-white' :
-                                 player.role === 'HC' ? 'bg-gray-600 text-white' : 'bg-purple-600 text-white'
+                                player.role === 'F' ? 'bg-emerald-600 text-white' : 'bg-purple-600 text-white'
                               }`}>
                                 {player.role}
                               </span>
@@ -1694,7 +1703,7 @@ export default function App() {
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
                 <h3 className="font-bold text-white text-base">Cambio Fase d'Asta</h3>
                 <p className="text-xs text-slate-400">
-                  Imposta quale reparto chiamare. Il sistema limita automaticamente le offerte solo a chi ha slot liberi.
+                  Imposta quale reparto chiamare. Il sistema limita automaticamente le offerte a chi ha slot liberi.
                 </p>
                 <div className="space-y-2">
                   {PHASES.map((p) => {
