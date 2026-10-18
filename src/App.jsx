@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Trophy, Users, Play, Pause, RotateCcw, Clock, 
-  Search, ShieldAlert, Award, AlertCircle, 
-  Volume2, VolumeX, QrCode, Download, Settings, 
+import {
+  Trophy, Users, Play, Pause, RotateCcw, Clock,
+  Search, ShieldAlert, Award, AlertCircle,
+  Volume2, VolumeX, QrCode, Download, Settings,
   LogOut, UserCheck, Flame, FastForward, Info, BarChart3, Trash2
 } from 'lucide-react';
-
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
-import { 
+import {
   getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, runTransaction
 } from 'firebase/firestore';
 
@@ -22,16 +21,45 @@ const firebaseConfig = {
   appId: "1:432619397838:web:5d4d0ed6769768fdc3669f",
   measurementId: "G-SQE5SHTJ3B"
 };
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+/* STREAMING_CHUNK:Time Synchronization Logic... */
+let globalTimeOffset = 0;
+export const getNow = () => Date.now() + globalTimeOffset;
+
+const syncTimeWithNetwork = async () => {
+  try {
+    const start = Date.now();
+    // Tenta di recuperare l'orario dall'header HTTP del server corrente
+    const res = await fetch(window.location.origin, { method: 'HEAD', cache: 'no-store' }).catch(() => null);
+    const dateHeader = res?.headers?.get('date');
+
+    if (dateHeader) {
+      const serverTime = new Date(dateHeader).getTime();
+      const latency = (Date.now() - start) / 2;
+      globalTimeOffset = serverTime - (start + latency);
+    } else {
+      // Fallback su un'API di time pubblica se in localhost o header non presente
+      const fallbackRes = await fetch('https://worldtimeapi.org/api/timezone/Etc/UTC', { cache: 'no-store' });
+      const data = await fallbackRes.json();
+      const serverTime = new Date(data.utc_datetime).getTime();
+      const latency = (Date.now() - start) / 2;
+      globalTimeOffset = serverTime - (start + latency);
+    }
+  } catch (e) {
+    console.warn("Sync orario fallito, si utilizza l'orologio locale", e);
+  }
+};
+// Avvio immediato della sincronizzazione
+syncTimeWithNetwork();
 
 /* STREAMING_CHUNK:Persistent ID Logic... */
 const getOrCreateUserId = () => {
   let uid = sessionStorage.getItem('dunkest_session_uid');
   if (!uid) {
-    uid = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+    uid = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(); // Qui è ok Date.now() perchè è solo per generare un ID
     sessionStorage.setItem('dunkest_session_uid', uid);
   }
   return uid;
@@ -78,7 +106,7 @@ const ROSTER_SLOT_SCHEMA = {
   G: { total: 4 },
   F: { total: 4 },
   C: { total: 2 },
-  HC: { total: 1 } 
+  HC: { total: 1 }
 };
 
 const PHASES = [
@@ -92,7 +120,6 @@ const PHASES = [
 /* STREAMING_CHUNK:App Component Initialization... */
 export default function App() {
   const [user, setUser] = useState(null);
-  
   const [roomCode, setRoomCode] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -106,18 +133,15 @@ export default function App() {
       return 'DUNKEST25';
     }
   });
-
   const [teamName, setTeamName] = useState(() => sessionStorage.getItem('dunk_teamName') || '');
   const [managerName, setManagerName] = useState(() => sessionStorage.getItem('dunk_managerName') || '');
   const [hasJoined, setHasJoined] = useState(() => sessionStorage.getItem('dunk_hasJoined') === 'true');
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem('dunk_isAdmin') === 'true');
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [activeTab, setActiveTab] = useState('auction'); 
+  const [activeTab, setActiveTab] = useState('auction');
   const [showQRModal, setShowQRModal] = useState(false);
-  
   const [playersDB, setPlayersDB] = useState([]);
   const [isPlayersLoading, setIsPlayersLoading] = useState(true);
-
   const [roomData, setRoomData] = useState({
     code: 'DUNKEST25',
     phase: 'guardie_starters',
@@ -131,7 +155,6 @@ export default function App() {
     boughtPlayers: []
   });
 
-  // Client-side timer state
   const [timeLeft, setTimeLeft] = useState(20);
   const [customBidAmount, setCustomBidAmount] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -152,9 +175,7 @@ export default function App() {
           if (p.Position === 'Forward') role = 'F';
           if (p.Position === 'Center') role = 'C';
           if (p.Position === 'Head Coach') role = 'HC';
-
           const priceParsed = parseFloat((p["Cr 26/27"] || "1,0").replace(',', '.')) || 4.0;
-
           return {
             id: `p_${index}`,
             name: `${p["First Name"]} ${p["Last Name"]}`.trim(),
@@ -191,19 +212,24 @@ export default function App() {
         setUser({ ...usr, uid: localId });
       }
     });
-    return () => unsubscribe();
+
+    // Risincronizza regolarmente l'orologio ogni 5 minuti per compensare eventuali rallentamenti hardware
+    const clockSyncInterval = setInterval(syncTimeWithNetwork, 300000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(clockSyncInterval);
+    };
   }, []);
 
   /* STREAMING_CHUNK:Firestore Synchronization... */
   useEffect(() => {
     if (!db || !hasJoined) return;
-
     const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
     const unsubscribe = onSnapshot(roomDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         
-        // Check if user was kicked by admin
         const myId = user?.uid;
         if (myId && data.participants && !data.participants.some(p => p.id === myId)) {
              setHasJoined(false);
@@ -214,7 +240,6 @@ export default function App() {
         
         setRoomData(data);
       } else {
-        // Room deleted
         setHasJoined(false);
         sessionStorage.removeItem('dunk_hasJoined');
         showNotice("La stanza è stata eliminata.");
@@ -222,39 +247,30 @@ export default function App() {
     }, (error) => {
       console.warn("Firestore snapshot error:", error);
     });
-
     return () => unsubscribe();
   }, [hasJoined, roomCode, user?.uid]);
 
   /* STREAMING_CHUNK:Timezone-Independent Timer Logic... */
-  // The absolute core of fixing the clock desync: 
-  // We calculate remaining time based on Server's target 'endsAt' timestamp versus Client's local 'Date.now()'.
-  // Even if Client A is 2 hours ahead of Client B, the difference between (TargetTime - CurrentTime) remains exactly the same duration.
   useEffect(() => {
     if (!roomData.currentAuction) return;
-
     if (roomData.isTimerPaused) {
-       // If the timer is explicitly paused, show the frozen time.
        setTimeLeft(roomData.currentAuction.pausedTimeLeft || 20);
        return;
     }
 
     const interval = setInterval(() => {
-      const now = Date.now();
-      // Calculate remaining seconds
+      const now = getNow(); // <-- UTILIZZA ORARIO SINCRONIZZATO
       let diff = Math.max(0, Math.ceil((roomData.currentAuction.endsAt - now) / 1000));
       
       const maxTimer = roomData.timerSeconds || 20;
       if (diff > maxTimer) diff = maxTimer;
-
       setTimeLeft(diff);
 
-      // Client triggers the end
       if (diff <= 0) {
         clearInterval(interval);
         handleAuctionExpired();
       }
-    }, 100); // 100ms precision for smoother sync
+    }, 100); 
 
     return () => clearInterval(interval);
   }, [roomData.currentAuction, roomData.isTimerPaused]);
@@ -262,7 +278,6 @@ export default function App() {
   /* STREAMING_CHUNK:Processing Robust Auction Expiration... */
   const handleAuctionExpired = async () => {
     if (!roomData.currentAuction) return;
-
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
       await runTransaction(db, async (transaction) => {
@@ -270,13 +285,10 @@ export default function App() {
         if (!snap.exists()) return;
         const currentData = snap.data();
         
-        // Stop if someone already processed it or cleared it
         if (!currentData.currentAuction) return;
 
-        // SERVER TIME VALIDATION: 
-        // We add a tiny 1500ms grace period for high-latency connections.
-        // If the server's expected end time is STILL in the future, abort.
-        if (!currentData.isTimerPaused && Date.now() < currentData.currentAuction.serverExpirationThreshold) {
+        // SERVER TIME VALIDATION UTILIZZANDO ORARIO SINCRONIZZATO
+        if (!currentData.isTimerPaused && getNow() < currentData.currentAuction.serverExpirationThreshold) {
             return;
         }
 
@@ -360,6 +372,7 @@ export default function App() {
     if (currentPhase.id === 'riserve_libere') {
       return participant.roster.length < TOTAL_ROSTER_SIZE;
     }
+
     return true;
   };
 
@@ -393,7 +406,6 @@ export default function App() {
     }
 
     const currentUserId = user?.uid || getOrCreateUserId();
-
     const newParticipant = {
       id: currentUserId,
       name: managerName.trim(),
@@ -428,7 +440,7 @@ export default function App() {
             serverData = roomSnap.data();
             const list = serverData.participants || [];
             const idx = list.findIndex(p => p.id === currentUserId);
-
+            
             if (idx >= 0) {
               list[idx] = { ...list[idx], name: newParticipant.name, teamName: newParticipant.teamName, isAdmin: asAdmin || list[idx].isAdmin };
             } else {
@@ -437,6 +449,7 @@ export default function App() {
             transaction.update(roomDocRef, { participants: list });
             serverData.participants = list;
           }
+
           setRoomData(serverData);
         });
 
@@ -445,11 +458,12 @@ export default function App() {
         sessionStorage.setItem('dunk_managerName', newParticipant.name);
         sessionStorage.setItem('dunk_hasJoined', 'true');
         sessionStorage.setItem('dunk_isAdmin', String(asAdmin));
-
+        
         setIsAdmin(asAdmin);
         setHasJoined(true);
         showNotice(`Benvenuto all'asta Dunkest, ${newParticipant.teamName}!`);
         return;
+
       } catch (err) {
         console.error("Transazione fallita:", err);
         showNotice("Errore di rete. Riprova.");
@@ -463,7 +477,6 @@ export default function App() {
       showNotice("Seleziona prima un giocatore dal database!");
       return;
     }
-
     const currentParticipant = roomData.participants.find(p => p.id === user?.uid);
     if (!currentParticipant) return;
 
@@ -477,8 +490,8 @@ export default function App() {
 
     const timerDuration = roomData.timerSeconds || 20;
     
-    // Scadenza assoluta sul server per garantire uniformità tra tutti i device (Fuso orario indipendente)
-    const now = Date.now();
+    // Scadenza calcolata in base all'orario globale sincronizzato
+    const now = getNow();
     const localEndsAt = now + (timerDuration * 1000);
     const serverExpirationThreshold = localEndsAt + 1500; 
 
@@ -488,7 +501,7 @@ export default function App() {
       highBidderId: currentParticipant.id,
       highBidderName: currentParticipant.teamName,
       endsAt: localEndsAt,
-      pausedTimeLeft: timerDuration, // Initialize paused Time
+      pausedTimeLeft: timerDuration,
       serverExpirationThreshold: serverExpirationThreshold,
       bidHistory: [
         {
@@ -522,6 +535,7 @@ export default function App() {
 
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
+      
       await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(roomDocRef);
         if (!snap.exists()) return;
@@ -529,9 +543,9 @@ export default function App() {
         
         if (!currentData.currentAuction) throw new Error("Asta già chiusa!");
 
-        // Server check to strictly block phantom bids after time expired
-        if (!currentData.isTimerPaused && Date.now() > currentData.currentAuction.serverExpirationThreshold) {
-           throw new Error("L'asta è già terminata.");
+        // Server check to strictly block phantom bids after time expired using synced clock
+        if (!currentData.isTimerPaused && getNow() > currentData.currentAuction.serverExpirationThreshold) {
+           throw new Error("L'asta è terminata.");
         }
 
         const currentHighBid = currentData.currentAuction.currentBid;
@@ -544,7 +558,7 @@ export default function App() {
         if (targetBid > maxAllowed) throw new Error(`Supera il tetto massimo (${maxAllowed} cr)`);
 
         const timerDuration = currentData.timerSeconds || 20;
-        const localEndsAt = Date.now() + (timerDuration * 1000);
+        const localEndsAt = getNow() + (timerDuration * 1000); // <-- UTILIZZA ORARIO SINCRONIZZATO
 
         const newHistoryEntry = {
           bidderId: currentParticipant.id,
@@ -569,6 +583,7 @@ export default function App() {
           isTimerPaused: false
         });
       });
+
       if (soundEnabled) playBidSound();
       setCustomBidAmount('');
     } catch (err) {
@@ -592,20 +607,18 @@ export default function App() {
         let nextPausedTimeLeft = currentData.currentAuction.pausedTimeLeft;
 
         if (nextPaused) {
-           // We freeze the exact remaining seconds based on the server clock diff
-           nextPausedTimeLeft = Math.max(0, Math.ceil((currentData.currentAuction.endsAt - Date.now()) / 1000));
+           nextPausedTimeLeft = Math.max(0, Math.ceil((currentData.currentAuction.endsAt - getNow()) / 1000));
         } else {
-           // We resume, projecting the frozen time into a new future endsAt timestamp
-           nextEndsAt = Date.now() + ((currentData.currentAuction.pausedTimeLeft || 20) * 1000);
+           nextEndsAt = getNow() + ((currentData.currentAuction.pausedTimeLeft || 20) * 1000);
            currentData.currentAuction.serverExpirationThreshold = nextEndsAt + 1500;
         }
 
         transaction.update(roomDocRef, {
           isTimerPaused: nextPaused,
-          currentAuction: { 
-            ...currentData.currentAuction, 
-            endsAt: nextEndsAt,
-            pausedTimeLeft: nextPausedTimeLeft
+          currentAuction: {
+             ...currentData.currentAuction,
+             endsAt: nextEndsAt,
+             pausedTimeLeft: nextPausedTimeLeft
           }
         });
       });
@@ -617,20 +630,21 @@ export default function App() {
     try {
       const roomDocRef = doc(db, 'rooms', roomCode.toUpperCase());
       await setDoc(roomDocRef, { 
-        currentAuction: { 
-          ...roomData.currentAuction, 
-          endsAt: Date.now() + (secs * 1000),
-          pausedTimeLeft: secs,
-          serverExpirationThreshold: Date.now() + (secs * 1000) + 1500 
-        },
+         currentAuction: {
+           ...roomData.currentAuction,
+           endsAt: getNow() + (secs * 1000),
+           pausedTimeLeft: secs,
+           serverExpirationThreshold: getNow() + (secs * 1000) + 1500 
+         },
         isTimerPaused: false 
-      }, { merge: true });
+       }, { merge: true });
     } catch(e){}
   };
 
   const undoLastBid = async () => {
     if (!isAdmin || !roomData.currentAuction || !roomData.currentAuction.bidHistory?.length) return;
     const history = [...roomData.currentAuction.bidHistory];
+    
     if (history.length <= 1) {
       showNotice("Impossibile annullare l'offerta di apertura! Puoi solo annullare l'asta corrente.");
       return;
@@ -647,9 +661,9 @@ export default function App() {
           currentBid: prev.amount,
           highBidderId: prev.bidderId,
           highBidderName: prev.bidderName,
-          endsAt: Date.now() + (timerDuration * 1000),
+          endsAt: getNow() + (timerDuration * 1000),
           pausedTimeLeft: timerDuration,
-          serverExpirationThreshold: Date.now() + (timerDuration * 1000) + 1500,
+          serverExpirationThreshold: getNow() + (timerDuration * 1000) + 1500,
           bidHistory: history
         },
         isTimerPaused: false
@@ -694,7 +708,7 @@ export default function App() {
       await setDoc(roomDocRef, { turnDirection: nextDir }, { merge: true });
     } catch(e){}
   };
-  
+
   const deleteRoom = async () => {
     if (!isAdmin) return;
     if (confirm("Sei sicuro di voler eliminare DEFINITIVAMENTE questa stanza e tutti i progressi?")) {
@@ -722,7 +736,6 @@ export default function App() {
            const targetManager = currentParts.find(p => p.id === managerId);
            
            if (targetManager) {
-               // Rimuovi dal DB i giocatori che aveva comprato
                const managerPlayerIds = targetManager.roster.map(p => p.id);
                const newBoughtPlayers = (currentData.boughtPlayers || []).filter(pid => !managerPlayerIds.includes(pid));
                
@@ -765,6 +778,7 @@ export default function App() {
     return playersDB.filter(p => {
       if (boughtSet.has(p.id)) return false;
       if (!currentPhaseConfig.allowedRoles.includes(p.role)) return false;
+      
       if (searchTerm) {
         const query = searchTerm.toLowerCase();
         return p.name.toLowerCase().includes(query) || p.team.toLowerCase().includes(query) || p.role.toLowerCase().includes(query);
@@ -775,11 +789,9 @@ export default function App() {
 
   if (!hasJoined) {
     const isFromQRCode = window.location.search.includes('room=');
-
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-600/10 via-purple-900/10 to-transparent pointer-events-none" />
-
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-md">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
@@ -805,7 +817,6 @@ export default function App() {
                 }`}
               />
             </div>
-
             <div>
               <label className="text-xs font-semibold uppercase text-slate-400 block mb-1">Nome Manager</label>
               <input
@@ -816,7 +827,6 @@ export default function App() {
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium focus:outline-none focus:border-amber-500 transition"
               />
             </div>
-
             <div>
               <label className="text-xs font-semibold uppercase text-slate-400 block mb-1">Nome Squadra Dunkest</label>
               <input
@@ -836,7 +846,6 @@ export default function App() {
                 <Users className="w-4 h-4 text-emerald-400" />
                 <span>Entra (Manager)</span>
               </button>
-
               {!isFromQRCode && (
                 <button
                   onClick={() => handleJoinOrCreate(true)}
@@ -957,7 +966,6 @@ export default function App() {
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
           </button>
-
           <button
             onClick={() => setShowQRModal(true)}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-300 flex items-center space-x-1.5 transition border border-slate-700"
@@ -965,7 +973,6 @@ export default function App() {
             <QrCode className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">Invita con QR</span>
           </button>
-
           <button
             onClick={handleLeaveRoom}
             className="p-2 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-800/50 text-red-400 transition-colors flex items-center justify-center"
@@ -988,7 +995,7 @@ export default function App() {
             {roomData.turnDirection === 'clockwise' ? 'Orario ↻' : 'Antiorario ↺'}
           </span>
         </div>
-
+        
         {/* Caller Turn Indicator */}
         <div className="flex items-center space-x-2 mt-2 sm:mt-0">
           <span className="text-slate-400">Tocca chiamare a:</span>
@@ -1007,6 +1014,7 @@ export default function App() {
       <main className="flex-1 p-4 max-w-7xl w-full mx-auto">
         {activeTab === 'auction' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
             {/* Left Column: Live Bidding Arena */}
             <div className="lg:col-span-8 space-y-6">
               {/* CURRENT PLAYER IN AUCTION BOX */}
@@ -1030,7 +1038,7 @@ export default function App() {
                           roomData.currentAuction.player.role === 'F' ? 'bg-emerald-500 text-slate-950' : 
                           roomData.currentAuction.player.role === 'HC' ? 'bg-gray-200 text-slate-950' : 'bg-purple-500 text-white'
                         }`}>
-                          {roomData.currentAuction.player.role === 'G' ? 'Guardia (G)' :
+                          {roomData.currentAuction.player.role === 'G' ? 'Guardia (G)' : 
                            roomData.currentAuction.player.role === 'F' ? 'Ala (F)' : 
                            roomData.currentAuction.player.role === 'HC' ? 'Coach (HC)' : 'Centro (C)'}
                         </span>
@@ -1071,7 +1079,6 @@ export default function App() {
                         <span className="text-lg font-bold text-slate-400">Crediti</span>
                       </div>
                     </div>
-
                     <div className="text-center sm:text-right">
                       <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">In Vantaggio</p>
                       <p className="text-xl font-bold text-emerald-400 flex items-center justify-center sm:justify-end space-x-2">
@@ -1112,7 +1119,6 @@ export default function App() {
                               <span>Offerte Rapide in Sincro:</span>
                               <span>Tuo tetto massimo: <strong className="text-amber-400">{maxAllowed} cr</strong></span>
                             </div>
-
                             {/* Quick Bid Increment Buttons */}
                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-3">
                               <button
@@ -1140,7 +1146,6 @@ export default function App() {
                                 +10 ({roomData.currentAuction.currentBid + 10})
                               </button>
                             </div>
-
                             {/* Manual Custom Amount Bid Input */}
                             <div className="flex gap-2">
                               <input
@@ -1210,11 +1215,10 @@ export default function App() {
                       <h2 className="text-2xl font-black text-white">Chiamata Giocatore</h2>
                       <p className="text-sm text-slate-400">
                         {isMyCallingTurn 
-                          ? "🎯 È IL TUO TURNO! Seleziona un giocatore e apri l'asta con un'offerta di base." 
+                          ? "🔥 IL TUO TURNO! Seleziona un giocatore e apri l'asta con un'offerta di base." 
                           : `Turno di ${activeCaller?.teamName || 'un altro manager'}. Puoi comunque esplorare il database.`}
                       </p>
                     </div>
-
                     <div className="flex items-center space-x-2">
                       <span className="text-xs text-slate-400 font-semibold">Filtro Fase:</span>
                       <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/40 px-3 py-1 rounded-full font-bold">
@@ -1251,8 +1255,8 @@ export default function App() {
                             key={player.id}
                             onClick={() => setSelectedNominee(player)}
                             className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-amber-500/10 border-amber-500 text-white shadow-md'
+                              isSelected 
+                                ? 'bg-amber-500/10 border-amber-500 text-white shadow-md' 
                                 : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/50 text-slate-300'
                             }`}
                           >
@@ -1270,7 +1274,6 @@ export default function App() {
                                 <p className="text-xs text-slate-400">{player.team} • {player.tier}</p>
                               </div>
                             </div>
-
                             <div className="flex items-center space-x-4">
                               <div className="text-right">
                                 <span className="text-xs text-slate-400 block">Dunkest Cr</span>
@@ -1295,7 +1298,6 @@ export default function App() {
                         <span className="text-xs text-amber-400 font-semibold uppercase">Giocatore Selezionato:</span>
                         <h4 className="text-lg font-black text-white">{selectedNominee.name} ({selectedNominee.role} - {selectedNominee.team})</h4>
                       </div>
-
                       <div className="flex items-center space-x-3 w-full sm:w-auto">
                         <div className="flex items-center space-x-2">
                           <label className="text-xs text-slate-400 font-semibold">Base d'asta:</label>
@@ -1307,13 +1309,12 @@ export default function App() {
                             className="w-20 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl font-bold text-amber-400 text-center focus:outline-none"
                           />
                         </div>
-
                         <button
                           onClick={handleStartNomination}
                           disabled={!isMyCallingTurn && !isAdmin}
                           className={`flex-1 sm:flex-initial py-3 px-6 rounded-xl font-black text-sm flex items-center justify-center space-x-2 transition ${
                             isMyCallingTurn || isAdmin
-                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-lg shadow-orange-500/25 active:scale-95'
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-lg shadow-orange-500/25 active:scale-95' 
                               : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                           }`}
                         >
@@ -1334,15 +1335,14 @@ export default function App() {
                     <span>Cronologia Rilanci in Tempo Reale</span>
                   </h3>
                 </div>
-
                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
                   {roomData.currentAuction?.bidHistory?.length > 0 ? (
                     roomData.currentAuction.bidHistory.map((item, idx) => (
                       <div
                         key={idx}
                         className={`p-3 rounded-xl flex items-center justify-between text-xs transition ${
-                          idx === 0
-                            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold'
+                          idx === 0 
+                            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold' 
                             : 'bg-slate-950/40 border border-slate-800/50 text-slate-400'
                         }`}
                       >
@@ -1464,7 +1464,6 @@ export default function App() {
                   <Users className="w-4 h-4 text-amber-400" />
                   <span>Partecipanti alla Stanza ({roomData.participants.length})</span>
                 </h3>
-
                 <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
                   {roomData.participants.map((m, idx) => {
                     const isTurn = roomData.activeCallerIndex === idx;
@@ -1487,7 +1486,6 @@ export default function App() {
                             <p className="text-[10px] text-slate-400">{m.name} • {m.roster.length}/{TOTAL_ROSTER_SIZE} acq.</p>
                           </div>
                         </div>
-
                         <div className="text-right">
                           <span className="font-mono font-bold text-emerald-400">{m.credits} cr</span>
                           {isTurn && <span className="block text-[9px] text-amber-400 font-bold uppercase">In Turno</span>}
@@ -1508,7 +1506,6 @@ export default function App() {
                 <h2 className="text-2xl font-black text-white">Tutte le Rose della Lega</h2>
                 <p className="text-sm text-slate-400">Verifica in tempo reale crediti spesi e slot occupati per ogni franchigia Dunkest.</p>
               </div>
-
               <button
                 onClick={() => {
                   const exportJson = JSON.stringify(roomData.participants, null, 2);
@@ -1565,7 +1562,6 @@ export default function App() {
                         )}
                       </div>
                     </div>
-
                     <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between text-xs text-slate-400">
                       <span>Spesa Totale: <strong className="text-slate-200">{totalSpent} cr</strong></span>
                       <span>Slot: <strong className="text-white">{manager.roster.length} / {TOTAL_ROSTER_SIZE}</strong></span>
@@ -1583,7 +1579,7 @@ export default function App() {
               <h2 className="text-2xl font-black text-white">Statistiche dell'Asta Dunkest</h2>
               <p className="text-sm text-slate-400">Analisi approfondita sui crediti spesi, costi medi per ruolo e record acquisti.</p>
             </div>
-
+            
             {/* Role Breakdown Cards */}
             {(() => {
               const allBought = roomData.participants.flatMap(p => p.roster);
@@ -1609,7 +1605,6 @@ export default function App() {
                         <span className="text-xs text-slate-400">{guardsBought.length} acq.</span>
                       </div>
                     </div>
-
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-lg">
                       <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Ali (F)</span>
                       <div className="mt-2 flex items-baseline justify-between">
@@ -1617,7 +1612,6 @@ export default function App() {
                         <span className="text-xs text-slate-400">{forwardsBought.length} acq.</span>
                       </div>
                     </div>
-
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-lg">
                       <span className="text-xs text-purple-400 font-bold uppercase tracking-wider">Centri (C)</span>
                       <div className="mt-2 flex items-baseline justify-between">
@@ -1641,7 +1635,6 @@ export default function App() {
                       <Award className="w-5 h-5 text-amber-400" />
                       <span>I Giocatori più Costosi dell'Asta</span>
                     </h3>
-
                     <div className="space-y-2">
                       {topPurchases.length === 0 ? (
                         <p className="text-slate-500 text-xs py-4 text-center">Nessun giocatore assegnato al momento.</p>
@@ -1652,8 +1645,8 @@ export default function App() {
                               <span className="font-mono font-black text-amber-400 w-5">#{idx + 1}</span>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
                                 player.role === 'G' ? 'bg-blue-600 text-white' :
-                                player.role === 'F' ? 'bg-emerald-600 text-white' : 
-                                player.role === 'HC' ? 'bg-gray-600 text-white' : 'bg-purple-600 text-white'
+                                player.role === 'F' ? 'bg-emerald-600 text-white' :
+                                 player.role === 'HC' ? 'bg-gray-600 text-white' : 'bg-purple-600 text-white'
                               }`}>
                                 {player.role}
                               </span>
@@ -1703,7 +1696,6 @@ export default function App() {
                 <p className="text-xs text-slate-400">
                   Imposta quale reparto chiamare. Il sistema limita automaticamente le offerte solo a chi ha slot liberi.
                 </p>
-
                 <div className="space-y-2">
                   {PHASES.map((p) => {
                     const isCurrent = roomData.phase === p.id;
@@ -1712,8 +1704,8 @@ export default function App() {
                         key={p.id}
                         onClick={() => setAuctionPhase(p.id)}
                         className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between text-xs font-bold transition ${
-                          isCurrent
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-md'
+                          isCurrent 
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-md' 
                             : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
                         }`}
                       >
@@ -1731,13 +1723,12 @@ export default function App() {
                 <p className="text-xs text-slate-400">
                   Modifica il senso di chiamata o forza il passaggio di turno in caso di assenze o dubbi.
                 </p>
-
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
                     <div>
                       <span className="text-xs text-slate-400 block font-semibold">Direzione Giro:</span>
                       <span className="text-sm font-bold text-white capitalize">
-                        {roomData.turnDirection === 'clockwise' ? 'Senso Orario (1 → 2 → 3)' : 'Senso Antiorario (3 → 2 → 1)'}
+                        {roomData.turnDirection === 'clockwise' ? 'Senso Orario (1 → 3)' : 'Senso Antiorario (3 → 1)'}
                       </span>
                     </div>
                     <button
@@ -1747,7 +1738,6 @@ export default function App() {
                       Inverti Giro
                     </button>
                   </div>
-
                   <button
                     onClick={forcePassTurn}
                     className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center justify-center space-x-2"
@@ -1765,7 +1755,6 @@ export default function App() {
               <p className="text-xs text-slate-400">
                 Seleziona i crediti manualmente o rimuovi un manager dalla stanza (i suoi giocatori torneranno liberi).
               </p>
-
               <div className="space-y-3">
                 {roomData.participants.map((m, idx) => (
                   <div key={m.id} className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -1773,7 +1762,6 @@ export default function App() {
                       <span className="font-bold text-white text-sm">{m.teamName}</span>
                       <span className="text-slate-400 ml-2">({m.name})</span>
                     </div>
-
                     <div className="flex items-center space-x-2">
                       <label className="text-slate-400">Crediti:</label>
                       <input
@@ -1798,8 +1786,7 @@ export default function App() {
                         }}
                         className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-mono font-bold text-center"
                       />
-
-                      <button
+                      <button 
                         onClick={() => removeManager(m.id)}
                         className="p-1.5 text-red-400 hover:bg-red-950/40 rounded-lg"
                         title="Rimuovi manager e reimposta i suoi giocatori liberi"
@@ -1824,16 +1811,13 @@ export default function App() {
             >
               ✕
             </button>
-
             <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <QrCode className="w-6 h-6" />
             </div>
-
             <h3 className="font-black text-xl text-white">Invita Manager</h3>
             <p className="text-xs text-slate-400 mt-1 mb-4">
               I partecipanti possono inquadrare o inserire il codice stanza per collegarsi dal proprio telefono.
             </p>
-
             <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-inner">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
@@ -1843,12 +1827,10 @@ export default function App() {
                 className="w-44 h-44"
               />
             </div>
-
             <div className="mt-4 bg-slate-950 p-3 rounded-xl border border-slate-800">
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Codice Stanza Asta</span>
               <span className="font-mono text-xl font-black text-amber-400 tracking-widest">{roomData.code}</span>
             </div>
-
             <button
               onClick={() => {
                 navigator.clipboard.writeText(roomData.code);
